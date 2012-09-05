@@ -425,6 +425,10 @@ status_replace1(struct client *c, struct session *s, struct winlink *wl,
 		xsnprintf(tmp, sizeof tmp, "%%%u", wp->id);
 		ptr = tmp;
 		goto do_replace;
+	case 'U':
+		xsnprintf(tmp, sizeof tmp, "%s", getenv("USER"));
+		ptr = tmp;
+		goto do_replace;
 	case 'H':
 		if (gethostname(tmp, sizeof tmp) != 0)
 			fatal("gethostname failed");
