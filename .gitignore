@@ -10,3 +10,4 @@ tmux
 Makefile
 Makefile.in
 configure
+terminfo/
