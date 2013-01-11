@@ -8,11 +8,6 @@ require 'shellwords'
 
 task :default => :configure
 
-desc 'Perform a git-svn rebase on the master branch'
-task :pull do
-  sh 'git checkout master && git svn rebase && git checkout guns'
-end
-
 desc 'Configure tmux'
 task :configure do
   sh '/bin/sh autogen.sh' unless File.executable? 'configure'
