@@ -1516,7 +1516,7 @@ extern int       cfg_finished;
 extern int       cfg_references;
 extern struct causelist cfg_causes;
 void printflike2 cfg_add_cause(struct causelist *, const char *, ...);
-int		 load_cfg(const char *, struct cmd_ctx *, struct causelist *);
+enum cmd_retval	 load_cfg(const char *, struct cmd_ctx *, struct causelist *);
 void		 show_cfg_causes(struct session *);
 
 /* format.c */
@@ -2239,6 +2239,7 @@ struct window_choose_data	*window_choose_add_session(struct window_pane *,
 struct window_choose_data	*window_choose_add_item(struct window_pane *,
 			struct cmd_ctx *, struct winlink *, const char *,
 			char *, u_int);
+void	window_choose_expand_all(struct window_pane *);
 
 /* names.c */
 void		 queue_window_name(struct window *);
