@@ -283,7 +283,6 @@ window_create1(u_int sx, u_int sy)
 
 	w->lastlayout = -1;
 	w->layout_root = NULL;
-	TAILQ_INIT(&w->layout_list);
 
 	w->sx = sx;
 	w->sy = sy;
@@ -308,24 +307,36 @@ window_create1(u_int sx, u_int sy)
 struct window *
 window_create(const char *name, const char *cmd, const char *shell,
     const char *cwd, struct environ *env, struct termios *tio,
-    u_int sx, u_int sy, u_int hlimit,char **cause)
+    u_int sx, u_int sy, u_int hlimit, char **cause)
 {
 	struct window		*w;
 	struct window_pane	*wp;
+	const char		*prefix;
+	char			*cmd1;
 
 	w = window_create1(sx, sy);
 	wp = window_add_pane(w, hlimit);
-	layout_init(w);
-	if (window_pane_spawn(wp, cmd, shell, cwd, env, tio, cause) != 0) {
+	layout_init(w, wp);
+
+	if (*cmd != '\0') {
+		prefix = options_get_string(&w->options, "command-prefix");
+		xasprintf(&cmd1, "%s%s", prefix, cmd);
+	} else
+		cmd1 = xstrdup("");
+	if (window_pane_spawn(wp, cmd1, shell, cwd, env, tio, cause) != 0) {
 		window_destroy(w);
+		free(cmd1);
 		return (NULL);
 	}
+	free(cmd1);
+
 	w->active = TAILQ_FIRST(&w->panes);
 	if (name != NULL) {
 		w->name = xstrdup(name);
 		options_set_number(&w->options, "automatic-rename", 0);
 	} else
 		w->name = default_window_name(w);
+
 	return (w);
 }
 
@@ -333,6 +344,8 @@ void
 window_destroy(struct window *w)
 {
 	u_int	i;
+
+	window_unzoom(w);
 
 	if (window_index(w, &i) != 0)
 		fatalx("index not found");
@@ -454,6 +467,54 @@ window_find_string(struct window *w, const char *s)
 		return (NULL);
 
 	return (window_get_active_at(w, x, y));
+}
+
+int
+window_zoom(struct window_pane *wp)
+{
+	struct window		*w = wp->window;
+	struct window_pane	*wp1;
+
+	if (w->flags & WINDOW_ZOOMED)
+		return (-1);
+
+	if (!window_pane_visible(wp))
+		return (-1);
+	if (w->active != wp)
+		window_set_active_pane(w, wp);
+
+	TAILQ_FOREACH(wp1, &w->panes, entry) {
+		wp1->saved_layout_cell = wp1->layout_cell;
+		wp1->layout_cell = NULL;
+	}
+
+	w->saved_layout_root = w->layout_root;
+	layout_init(w, wp);
+	w->flags |= WINDOW_ZOOMED;
+
+	return (0);
+}
+
+int
+window_unzoom(struct window *w)
+{
+	struct window_pane	*wp, *wp1;
+
+	if (!(w->flags & WINDOW_ZOOMED))
+		return (-1);
+	wp = w->active;
+
+	w->flags &= ~WINDOW_ZOOMED;
+	layout_free(w);
+	w->layout_root = w->saved_layout_root;
+
+	TAILQ_FOREACH(wp1, &w->panes, entry) {
+		wp1->layout_cell = wp1->saved_layout_cell;
+		wp1->saved_layout_cell = NULL;
+	}
+	layout_fix_panes(w, w->sx, w->sy);
+
+	return (0);
 }
 
 struct window_pane *
@@ -586,6 +647,8 @@ window_printable_flags(struct session *s, struct winlink *wl)
 		flags[pos++] = '*';
 	if (wl == TAILQ_FIRST(&s->lastw))
 		flags[pos++] = '-';
+	if (wl->window->flags & WINDOW_ZOOMED)
+		flags[pos++] = 'Z';
 	if (pos == 0)
 		flags[pos++] = ' ';
 	flags[pos] = '\0';
@@ -702,6 +765,8 @@ window_pane_spawn(struct window_pane *wp, const char *cmd, const char *shell,
 		wp->cwd = xstrdup(cwd);
 	}
 
+	log_debug("spawn: %s -- %s", wp->shell, wp->cmd);
+
 	memset(&ws, 0, sizeof ws);
 	ws.ws_col = screen_size_x(&wp->base);
 	ws.ws_row = screen_size_y(&wp->base);
@@ -807,7 +872,6 @@ window_pane_timer_callback(unused int fd, unused short events, void *data)
 	wp->changes = 0;
 }
 
-/* ARGSUSED */
 void
 window_pane_read_callback(unused struct bufferevent *bufev, void *data)
 {
@@ -834,7 +898,6 @@ window_pane_read_callback(unused struct bufferevent *bufev, void *data)
 		fatal("gettimeofday failed.");
 }
 
-/* ARGSUSED */
 void
 window_pane_error_callback(
     unused struct bufferevent *bufev, unused short what, void *data)
@@ -847,32 +910,16 @@ window_pane_error_callback(
 void
 window_pane_resize(struct window_pane *wp, u_int sx, u_int sy)
 {
-	struct winsize	ws;
-
 	if (sx == wp->sx && sy == wp->sy)
 		return;
 	wp->sx = sx;
 	wp->sy = sy;
 
-	memset(&ws, 0, sizeof ws);
-	ws.ws_col = sx;
-	ws.ws_row = sy;
-
-	screen_resize(&wp->base, sx, sy);
+	screen_resize(&wp->base, sx, sy, wp->saved_grid == NULL);
 	if (wp->mode != NULL)
 		wp->mode->resize(wp, sx, sy);
 
-	if (wp->fd != -1 && ioctl(wp->fd, TIOCSWINSZ, &ws) == -1)
-#ifdef __sun
-		/*
-		 * Some versions of Solaris apparently can return an error when
-		 * resizing; don't know why this happens, can't reproduce on
-		 * other platforms and ignoring it doesn't seem to cause any
-		 * issues.
-		 */
-		if (errno != EINVAL)
-#endif
-		fatal("ioctl failed");
+	wp->flags |= PANE_RESIZE;
 }
 
 /*
@@ -928,7 +975,7 @@ window_pane_alternate_off(struct window_pane *wp, struct grid_cell *gc,
 	 * before copying back.
 	 */
 	if (sy > wp->saved_grid->sy)
-		screen_resize(s, sx, wp->saved_grid->sy);
+		screen_resize(s, sx, wp->saved_grid->sy, 1);
 
 	/* Restore the grid, cursor position and cell. */
 	grid_duplicate_lines(s->grid, screen_hsize(s), wp->saved_grid, 0, sy);
@@ -947,8 +994,8 @@ window_pane_alternate_off(struct window_pane *wp, struct grid_cell *gc,
 	 * the current size.
 	 */
 	wp->base.grid->flags |= GRID_HISTORY;
-	if (sy > wp->saved_grid->sy)
-		screen_resize(s, sx, sy);
+	if (sy > wp->saved_grid->sy || sx != wp->saved_grid->sx)
+		screen_resize(s, sx, sy, 1);
 
 	grid_destroy(wp->saved_grid);
 	wp->saved_grid = NULL;
@@ -1038,6 +1085,8 @@ window_pane_visible(struct window_pane *wp)
 {
 	struct window	*w = wp->window;
 
+	if (wp->layout_cell == NULL)
+		return (0);
 	if (wp->xoff >= w->sx || wp->yoff >= w->sy)
 		return (0);
 	if (wp->xoff + wp->sx > w->sx || wp->yoff + wp->sy > w->sy)
