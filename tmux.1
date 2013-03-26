@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 4 2011 $
+.Dd $Mdocdate: March 25 2013 $
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -675,7 +675,8 @@ command.
 Lock all clients attached to
 .Ar target-session .
 .It Xo Ic new-session
-.Op Fl AdD
+.Op Fl AdDP
+.Op Fl F Ar format
 .Op Fl n Ar window-name
 .Op Fl s Ar session-name
 .Op Fl t Ar target-session
@@ -740,6 +741,14 @@ or
 are invalid if
 .Fl t
 is used.
+.Pp
+The
+.Fl P
+option prints information about the new session after it has been created.
+By default, it uses the format
+.Ql #{session_name}:
+but a different format may be specified with
+.Fl F .
 .It Xo Ic refresh-client
 .Op Fl S
 .Op Fl t Ar target-client
@@ -936,7 +945,7 @@ command and keys modified or removed with
 .Ic bind-key
 and
 .Ic unbind-key .
-One command in accepts an argument,
+One command accepts an argument,
 .Ic copy-pipe ,
 which copies the selection and pipes it to a command.
 For example the following will bind
@@ -1095,7 +1104,7 @@ If
 is given, the output includes escape sequences for text and background
 attributes.
 .Fl C
-also escapes non-printable characters as octal \\xxx.
+also escapes non-printable characters as octal \exxx.
 .Fl J
 joins wrapped lines and preserves trailing spaces at each line's end.
 .Fl P
@@ -1212,7 +1221,7 @@ By default, the tree is collapsed and sessions must be expanded to windows
 with the right arrow key.
 The
 .Fl u
-will start with all all sessions expanded instead.
+option will start with all sessions expanded instead.
 .Pp
 If
 .Fl b
@@ -1470,9 +1479,9 @@ option.
 .It Xo Ic new-window
 .Op Fl adkP
 .Op Fl c Ar start-directory
+.Op Fl F Ar format
 .Op Fl n Ar window-name
 .Op Fl t Ar target-window
-.Op Fl F Ar format
 .Op Ar shell-command
 .Xc
 .D1 (alias: Ic neww )
@@ -2016,8 +2025,8 @@ command.
 .Nm
 also supports user options which are prefixed with a
 .Ql \&@ .
-User options may have any name, so long as it is prefixed with
-.Ql \&@,
+User options may have any name, so long as they are prefixed with
+.Ql \&@ ,
 and be set to any string.
 For example
 .Bd -literal -offset indent
@@ -2744,13 +2753,6 @@ Set clock colour.
 .Op Ic 12 | 24
 .Xc
 Set clock hour format.
-.Pp
-.It Ic command-prefix Ar string
-String prefixed to commands (apart from a plain shell as set by the
-.Ic default-shell
-option).
-The default is
-.Ql "exec\ " .
 .Pp
 .It Ic force-height Ar height
 .It Ic force-width Ar width
@@ -3526,14 +3528,14 @@ if
 returns success or the second
 .Ar command
 otherwise.
-With
-.Fl b ,
-.Ar shell-command
-is run in the background.
 Before being executed, shell-command is expanded using the rules specified in the
 .Sx FORMATS
 section, including those relevant to
 .Ar target-pane .
+With
+.Fl b ,
+.Ar shell-command
+is run in the background.
 .It Ic lock-server
 .D1 (alias: Ic lock )
 Lock each client individually by running the command specified by the
@@ -3547,14 +3549,14 @@ option.
 .D1 (alias: Ic run )
 Execute
 .Ar shell-command
-without creating a window.
-With
-.Fl b ,
-the command is run in the background.
+in the background without creating a window.
 Before being executed, shell-command is expanded using the rules specified in
 the
 .Sx FORMATS
 section.
+With
+.Fl b ,
+the command is run in the background.
 After it finishes, any output to stdout is displayed in copy mode (in the pane
 specified by
 .Fl t
@@ -3657,7 +3659,6 @@ outputs notifications.
 A notification will never occur inside an output block.
 .Pp
 The following notifications are defined:
-.Pp
 .Bl -tag -width Ds
 .It Ic %exit Op Ar reason
 The

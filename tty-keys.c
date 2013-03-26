@@ -448,7 +448,7 @@ tty_keys_next(struct tty *tty)
 	const char	*buf;
 	size_t		 len, size;
 	cc_t		 bspace;
-	int		 key, delay;
+	int		 key, delay, expired = 0;
 
 	/* Get key buffer. */
 	buf = EVBUFFER_DATA(tty->event->input);
@@ -498,6 +498,7 @@ tty_keys_next(struct tty *tty)
 		goto complete_key;
 	}
 
+first_key:
 	/* Is this a meta key? */
 	if (len >= 2 && buf[0] == '\033') {
 		if (buf[1] != '\033') {
@@ -507,7 +508,7 @@ tty_keys_next(struct tty *tty)
 		}
 
 		tk = tty_keys_find(tty, buf + 1, len - 1, &size);
-		if (tk != NULL) {
+		if (tk != NULL && (!expired || tk->next == NULL)) {
 			size++;	/* include escape */
 			if (tk->next != NULL)
 				goto partial_key;
@@ -518,7 +519,6 @@ tty_keys_next(struct tty *tty)
 		}
 	}
 
-first_key:
 	/* No key found, take first. */
 	key = (u_char) *buf;
 	size = 1;
@@ -540,8 +540,10 @@ partial_key:
 	/* If timer is going, check for expiration. */
 	if (tty->flags & TTY_TIMER) {
 		if (evtimer_initialized(&tty->key_timer) &&
-		    !evtimer_pending(&tty->key_timer, NULL))
+		    !evtimer_pending(&tty->key_timer, NULL)) {
+			expired = 1;
 			goto first_key;
+		}
 		return (0);
 	}
 
