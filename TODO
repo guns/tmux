@@ -27,7 +27,7 @@
 	* choose-pane command (augment choose-tree to do this?)
 	* choose-mode and copy-mode are very similar, make choose-mode a subset?
 	* flag to choose-* for sort order
-	* chose mode would be better per client than per window
+	* choose mode would be better per client than per window
 
 - improve monitor-*:
 	* straighten out rules for multiple clients
@@ -47,7 +47,7 @@
 - hooks!
 
 - warts on current naming:
-  	* display-time but message-fg/bg/attr
+	* display-time but message-fg/bg/attr
 	* list-* vs show-*
 	* server-info
 	* split-window -> split-pane??
@@ -55,6 +55,7 @@
 - way to keep a job running just read its last line of output for #()
 
 - better UTF-8 support:
+	* #22T can split in the middle of UTF-8 characters!
 	* window names and titles
 	* message display
 	* prompt input
@@ -76,8 +77,6 @@
 - bind commands to key sequences -- make it so ALL keys go through a table,
   first an implicit table in which C-b is the only default binding to a command
   that says "next key from $othertable" and so on. means -n can go away as well
-
-- why are -s and -t different for swap- and move-pane?
 
 - copy/paste improvements:
 	* case insensitive searching
