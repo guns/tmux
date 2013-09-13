@@ -150,6 +150,7 @@ void
 session_destroy(struct session *s)
 {
 	struct winlink	*wl;
+
 	log_debug("session %s destroyed", s->name);
 
 	RB_REMOVE(sessions, &sessions, s);
@@ -614,7 +615,7 @@ session_renumber_windows(struct session *s)
 	memcpy(&old_lastw, &s->lastw, sizeof old_lastw);
 	TAILQ_INIT(&s->lastw);
 	TAILQ_FOREACH(wl, &old_lastw, sentry) {
-		wl_new = winlink_find_by_index(&s->windows, wl->idx);
+		wl_new = winlink_find_by_window(&s->windows, wl->window);
 		if (wl_new != NULL)
 			TAILQ_INSERT_TAIL(&s->lastw, wl_new, sentry);
 	}

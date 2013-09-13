@@ -39,9 +39,6 @@
 extern char    *__progname;
 extern char   **environ;
 
-/* Default global configuration file. */
-#define TMUX_CONF "/etc/tmux.conf"
-
 /* Default prompt history length. */
 #define PROMPT_HISTORY 100
 
@@ -147,7 +144,7 @@ extern char   **environ;
 	"[layout #{window_layout}] #{window_id}"		\
 	"#{?window_active, (active),}";
 #define LIST_WINDOWS_WITH_SESSION_TEMPLATE			\
-	"#{session_name}: "					\
+	"#{session_name}:"					\
 	"#{window_index}: #{window_name}#{window_flags} "	\
 	"(#{window_panes} panes) "				\
 	"[#{window_width}x#{window_height}] "
@@ -249,15 +246,13 @@ enum tty_code_code {
 	TTYC_BEL,	/* bell, bl */
 	TTYC_BLINK,	/* enter_blink_mode, mb */
 	TTYC_BOLD,	/* enter_bold_mode, md */
-	TTYC_CC,	/* set colour cursor, Cc */
 	TTYC_CIVIS,	/* cursor_invisible, vi */
 	TTYC_CLEAR,	/* clear_screen, cl */
 	TTYC_CNORM,	/* cursor_normal, ve */
 	TTYC_COLORS,	/* max_colors, Co */
 	TTYC_CR,	/* restore cursor colour, Cr */
-	TTYC_CS1,	/* set cursor style, Cs */
+	TTYC_CS,	/* set cursor colour, Cs */
 	TTYC_CSR,	/* change_scroll_region, cs */
-	TTYC_CSR1,	/* reset cursor style, Csr */
 	TTYC_CUB,	/* parm_left_cursor, LE */
 	TTYC_CUB1,	/* cursor_left, le */
 	TTYC_CUD,	/* parm_down_cursor, DO */
@@ -387,6 +382,7 @@ enum tty_code_code {
 	TTYC_RMACS,	/* exit_alt_charset_mode */
 	TTYC_RMCUP,	/* exit_ca_mode, te */
 	TTYC_RMKX,	/* keypad_local, ke */
+	TTYC_SE,	/* reset cursor style, Se */
 	TTYC_SETAB,	/* set_a_background, AB */
 	TTYC_SETAF,	/* set_a_foreground, AF */
 	TTYC_SGR0,	/* exit_attribute_mode, me */
@@ -396,6 +392,7 @@ enum tty_code_code {
 	TTYC_SMKX,	/* keypad_xmit, ks */
 	TTYC_SMSO,	/* enter_standout_mode, so */
 	TTYC_SMUL,	/* enter_underline_mode, us */
+	TTYC_SS,	/* set cursor style, Ss */
 	TTYC_TSL,	/* to_status_line, tsl */
 	TTYC_VPA,	/* row_address, cv */
 	TTYC_XENL,	/* eat_newline_glitch, xn */
@@ -474,6 +471,10 @@ struct msg_identify_data {
 
 	char		term[TERMINAL_LENGTH];
 
+#ifdef __CYGWIN__
+	char		ttyname[TTY_NAME_MAX];
+#endif
+
 #define IDENTIFY_UTF8 0x1
 #define IDENTIFY_256COLOURS 0x2
 /* 0x4 unused */
@@ -544,6 +545,9 @@ enum mode_key_cmd {
 	MODEKEYEDIT_SWITCHMODEAPPEND,
 	MODEKEYEDIT_SWITCHMODEAPPENDLINE,
 	MODEKEYEDIT_SWITCHMODEBEGINLINE,
+	MODEKEYEDIT_SWITCHMODECHANGELINE,
+	MODEKEYEDIT_SWITCHMODESUBSTITUTE,
+	MODEKEYEDIT_SWITCHMODESUBSTITUTELINE,
 	MODEKEYEDIT_TRANSPOSECHARS,
 
 	/* Menu (choice) keys. */
@@ -937,6 +941,7 @@ struct window_pane {
 #define PANE_DROP 0x2
 #define PANE_FOCUSED 0x4
 #define PANE_RESIZE 0x8
+#define PANE_FOCUSPUSH 0x10
 
 	char		*cmd;
 	char		*shell;
@@ -1000,6 +1005,7 @@ struct window {
 #define WINDOW_REDRAW 0x4
 #define WINDOW_SILENCE 0x8
 #define WINDOW_ZOOMED 0x10
+#define WINDOW_ALERTFLAGS (WINDOW_BELL|WINDOW_ACTIVITY|WINDOW_SILENCE)
 
 	struct options	 options;
 
@@ -1228,6 +1234,7 @@ struct tty {
 #define TTY_UTF8 0x8
 #define TTY_STARTED 0x10
 #define TTY_OPENED 0x20
+#define TTY_FOCUS 0x40
 	int		 flags;
 
 	int		 term_flags;
@@ -1357,13 +1364,18 @@ struct client {
 };
 ARRAY_DECL(clients, struct client *);
 
-/* Parsed arguments. */
-struct args {
-	bitstr_t	*flags;
-	char		*values[SCHAR_MAX]; /* XXX This is awfully big. */
+/* Parsed arguments structures. */
+struct args_entry {
+	u_char			 flag;
+	char			*value;
+	RB_ENTRY(args_entry)	 entry;
+};
+RB_HEAD(args_tree, args_entry);
 
-	int		 argc;
-	char	       **argv;
+struct args {
+	struct args_tree	  tree;
+	int		 	  argc;
+	char	       		**argv;
 };
 
 /* Command and list of commands. */
@@ -1373,6 +1385,9 @@ struct cmd {
 
 	char			*file;
 	u_int			 line;
+
+#define CMD_CONTROL 0x1
+	int			 flags;
 
 	TAILQ_ENTRY(cmd)	 qentry;
 };
@@ -1437,7 +1452,6 @@ struct cmd_entry {
 	int		 flags;
 
 	void		 (*key_binding)(struct cmd *, int);
-	int		 (*check)(struct args *);
 	enum cmd_retval	 (*exec)(struct cmd *, struct cmd_q *);
 };
 
@@ -1535,16 +1549,19 @@ int		 format_cmp(struct format_entry *, struct format_entry *);
 RB_PROTOTYPE(format_tree, format_entry, entry, format_cmp);
 struct format_tree *format_create(void);
 void		 format_free(struct format_tree *);
-void printflike3 format_add(
-		     struct format_tree *, const char *, const char *, ...);
+void printflike3 format_add(struct format_tree *, const char *, const char *,
+		     ...);
 const char	*format_find(struct format_tree *, const char *);
 char		*format_expand(struct format_tree *, const char *);
 void		 format_session(struct format_tree *, struct session *);
 void		 format_client(struct format_tree *, struct client *);
-void		 format_winlink(
-		     struct format_tree *, struct session *, struct winlink *);
-void		 format_window_pane(struct format_tree *, struct window_pane *);
-void		 format_paste_buffer(struct format_tree *, struct paste_buffer *);
+void		 format_window(struct format_tree *, struct window *);
+void		 format_winlink(struct format_tree *, struct session *,
+		     struct winlink *);
+void		 format_window_pane(struct format_tree *,
+		     struct window_pane *);
+void		 format_paste_buffer(struct format_tree *,
+		     struct paste_buffer *);
 
 /* mode-key.c */
 extern const struct mode_key_table mode_key_tables[];
@@ -1720,6 +1737,8 @@ extern const char clock_table[14][5][5];
 void		 clock_draw(struct screen_write_ctx *, int, int);
 
 /* arguments.c */
+int		 args_cmp(struct args_entry *, struct args_entry *);
+RB_PROTOTYPE(args_tree, args_entry, entry, args_cmp);
 struct args	*args_create(int, ...);
 struct args	*args_parse(const char *, int, char **);
 void		 args_free(struct args *);
@@ -1852,7 +1871,7 @@ int		 cmdq_free(struct cmd_q *);
 void printflike2 cmdq_print(struct cmd_q *, const char *, ...);
 void printflike2 cmdq_info(struct cmd_q *, const char *, ...);
 void printflike2 cmdq_error(struct cmd_q *, const char *, ...);
-int		 cmdq_guard(struct cmd_q *, const char *);
+int		 cmdq_guard(struct cmd_q *, const char *, int);
 void		 cmdq_run(struct cmd_q *, struct cmd_list *);
 void		 cmdq_append(struct cmd_q *, struct cmd_list *);
 int		 cmdq_continue(struct cmd_q *);
@@ -2256,8 +2275,10 @@ void	window_choose_collapse_all(struct window_pane *);
 void	window_choose_set_current(struct window_pane *, u_int);
 
 /* names.c */
-void		 queue_window_name(struct window *);
-char		*default_window_name(struct window *);
+void	 queue_window_name(struct window *);
+char	*default_window_name(struct window *);
+char	*format_window_name(struct window *);
+char	*parse_window_name(const char *);
 
 /* signal.c */
 void	set_signals(void(*)(int, short, void *));

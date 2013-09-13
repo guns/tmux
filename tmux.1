@@ -99,7 +99,9 @@ Force
 .Nm
 to assume the terminal supports 256 colours.
 .It Fl C
-Start in control mode.
+Start in control mode (see the
+.Sx CONTROL MODE
+section).
 Given twice
 .Xo ( Fl CC ) Xc
 disables echo.
@@ -626,9 +628,10 @@ If it does exist, exit with 0.
 Kill the
 .Nm
 server and clients and destroy all sessions.
-.It Ic kill-session
+.It Xo Ic kill-session
 .Op Fl a
 .Op Fl t Ar target-session
+.Xc
 Destroy the given session, closing any windows linked to it and no other
 sessions, and detaching all clients attached to it.
 If
@@ -2096,6 +2099,14 @@ The default is 500 milliseconds.
 .Op Ic on | off
 .Xc
 If enabled, the server will exit when there are no attached clients.
+.It Xo Ic focus-events
+.Op Ic on | off
+.Xc
+When enabled, focus events are requested from the terminal if supported and
+passed through to applications running in
+.Nm .
+Attached clients should be detached and attached again after changing this
+option.
 .It Xo Ic quiet
 .Op Ic on | off
 .Xc
@@ -2442,27 +2453,18 @@ environment variables are set and contain the string
 .It Ic status-left Ar string
 Display
 .Ar string
-to the left of the status bar.
+(by default the session name) to the left of the status bar.
 .Ar string
 will be passed through
 .Xr strftime 3
-before being used.
-By default, the session name is shown.
-.Ar string
-may contain any of the following special character sequences:
+and formats (see
+.Sx FORMATS Ns )
+will be expanded.
+It may also contain any of the following special character sequences:
 .Bl -column "Character pair" "Replaced with" -offset indent
 .It Sy "Character pair" Ta Sy "Replaced with"
 .It Li "#(shell-command)" Ta "First line of the command's output"
 .It Li "#[attributes]" Ta "Colour or attribute change"
-.It Li "#H" Ta "Hostname of local host"
-.It Li "#h" Ta "Hostname of local host without the domain name"
-.It Li "#F" Ta "Current window flag"
-.It Li "#I" Ta "Current window index"
-.It Li "#D" Ta "Current pane unique identifier"
-.It Li "#P" Ta "Current pane index"
-.It Li "#S" Ta "Session name"
-.It Li "#T" Ta "Current pane title"
-.It Li "#W" Ta "Current window name"
 .It Li "##" Ta "A literal" Ql #
 .El
 .Pp
@@ -2711,8 +2713,8 @@ The default is on.
 Control automatic window renaming.
 When this setting is enabled,
 .Nm
-will attempt - on supported platforms - to rename the window to reflect the
-command currently running in it.
+will rename the window automatically using the format specified by
+.Ic automatic-rename-format .
 This flag is automatically disabled for an individual window when a name
 is specified at creation with
 .Ic new-window
@@ -2725,6 +2727,13 @@ It may be switched off globally with:
 .Bd -literal -offset indent
 set-window-option -g automatic-rename off
 .Ed
+.Pp
+.It Ic automatic-rename-format Ar format
+The format (see
+.Sx FORMATS )
+used when the
+.Ic automatic-rename
+option is enabled.
 .Pp
 .It Ic c0-change-interval Ar interval
 .It Ic c0-change-trigger Ar trigger
@@ -3007,16 +3016,13 @@ flag with a
 .Ar format
 argument.
 This is a string which controls the output format of the command.
-Special character sequences are replaced as documented under the
-.Ic status-left
-option and an additional long form is accepted.
 Replacement variables are enclosed in
 .Ql #{
 and
 .Ql } ,
 for example
-.Ql #{session_name}
-is equivalent to
+.Ql #{session_name} .
+Some variables also have an shorter alias such as
 .Ql #S .
 Conditionals are also accepted by prefixing with
 .Ql \&?
@@ -3030,84 +3036,96 @@ will include the string
 if the session is attached and the string
 .Ql not attached
 if it is unattached.
+A limit may be placed on the length of the resultant string by prefixing it
+by an
+.Ql = ,
+a number and a colon, so
+.Ql #{=10:pane_title}
+will include at most the first 10 characters of the pane title.
 .Pp
 The following variables are available, where appropriate:
-.Bl -column "session_created_string" "Replaced with" -offset indent
-.It Sy "Variable name" Ta Sy "Replaced with"
-.It Li "alternate_on" Ta "If pane is in alternate screen"
-.It Li "alternate_saved_x" Ta "Saved cursor X in alternate screen"
-.It Li "alternate_saved_y" Ta "Saved cursor Y in alternate screen"
-.It Li "buffer_sample" Ta "First 50 characters from the specified buffer"
-.It Li "buffer_size" Ta "Size of the specified buffer in bytes"
-.It Li "client_activity" Ta "Integer time client last had activity"
-.It Li "client_activity_string" Ta "String time client last had activity"
-.It Li "client_created" Ta "Integer time client created"
-.It Li "client_created_string" Ta "String time client created"
-.It Li "client_cwd" Ta "Working directory of client"
-.It Li "client_height" Ta "Height of client"
-.It Li "client_last_session" Ta "Name of the client's last session"
-.It Li "client_prefix" Ta "1 if prefix key has been pressed"
-.It Li "client_readonly" Ta "1 if client is readonly"
-.It Li "client_session" Ta "Name of the client's session"
-.It Li "client_termname" Ta "Terminal name of client"
-.It Li "client_tty" Ta "Pseudo terminal of client"
-.It Li "client_utf8" Ta "1 if client supports utf8"
-.It Li "client_width" Ta "Width of client"
-.It Li "cursor_flag" Ta "Pane cursor flag"
-.It Li "cursor_x" Ta "Cursor X position in pane"
-.It Li "cursor_y" Ta "Cursor Y position in pane"
-.It Li "history_bytes" Ta "Number of bytes in window history"
-.It Li "history_limit" Ta "Maximum window history lines"
-.It Li "history_size" Ta "Size of history in bytes"
-.It Li "host" Ta "Hostname of local host"
-.It Li "insert_flag" Ta "Pane insert flag"
-.It Li "keypad_cursor_flag" Ta "Pane keypad cursor flag"
-.It Li "keypad_flag" Ta "Pane keypad flag"
-.It Li "line" Ta "Line number in the list"
-.It Li "mouse_any_flag" Ta "Pane mouse any flag"
-.It Li "mouse_button_flag" Ta "Pane mouse button flag"
-.It Li "mouse_standard_flag" Ta "Pane mouse standard flag"
-.It Li "mouse_utf8_flag" Ta "Pane mouse UTF-8 flag"
-.It Li "pane_active" Ta "1 if active pane"
-.It Li "pane_current_command" Ta "Current command if available"
-.It Li "pane_current_path" Ta "Current path if available"
-.It Li "pane_dead" Ta "1 if pane is dead"
-.It Li "pane_height" Ta "Height of pane"
-.It Li "pane_id" Ta "Unique pane ID"
-.It Li "pane_in_mode" Ta "If pane is in a mode"
-.It Li "pane_index" Ta "Index of pane"
-.It Li "pane_pid" Ta "PID of first process in pane"
-.It Li "pane_start_command" Ta "Command pane started with"
-.It Li "pane_start_path" Ta "Path pane started with"
-.It Li "pane_tabs" Ta "Pane tab positions"
-.It Li "pane_title" Ta "Title of pane"
-.It Li "pane_tty" Ta "Pseudo terminal of pane"
-.It Li "pane_width" Ta "Width of pane"
-.It Li "saved_cursor_x" Ta "Saved cursor X in pane"
-.It Li "saved_cursor_y" Ta "Saved cursor Y in pane"
-.It Li "scroll_region_lower" Ta "Bottom of scroll region in pane"
-.It Li "scroll_region_upper" Ta "Top of scroll region in pane"
-.It Li "session_attached" Ta "1 if session attached"
-.It Li "session_created" Ta "Integer time session created"
-.It Li "session_created_string" Ta "String time session created"
-.It Li "session_group" Ta "Number of session group"
-.It Li "session_grouped" Ta "1 if session in a group"
-.It Li "session_height" Ta "Height of session"
-.It Li "session_id" Ta "Unique session ID"
-.It Li "session_name" Ta "Name of session"
-.It Li "session_width" Ta "Width of session"
-.It Li "session_windows" Ta "Number of windows in session"
-.It Li "window_active" Ta "1 if window active"
-.It Li "window_find_matches" Ta "Matched data from the find-window command if available"
-.It Li "window_flags" Ta "Window flags"
-.It Li "window_height" Ta "Height of window"
-.It Li "window_id" Ta "Unique window ID"
-.It Li "window_index" Ta "Index of window"
-.It Li "window_layout" Ta "Window layout description"
-.It Li "window_name" Ta "Name of window"
-.It Li "window_panes" Ta "Number of panes in window"
-.It Li "window_width" Ta "Width of window"
-.It Li "wrap_flag" Ta "Pane wrap flag"
+.Bl -column "XXXXXXXXXXXXXXXXXXX" "XXXXX"
+.It Sy "Variable name" Ta Sy "Alias" Ta Sy "Replaced with"
+.It Li "alternate_on" Ta "" Ta "If pane is in alternate screen"
+.It Li "alternate_saved_x" Ta "" Ta "Saved cursor X in alternate screen"
+.It Li "alternate_saved_y" Ta "" Ta "Saved cursor Y in alternate screen"
+.It Li "buffer_sample" Ta "" Ta "First 50 characters from buffer"
+.It Li "buffer_size" Ta "" Ta "Size of the specified buffer in bytes"
+.It Li "client_activity" Ta "" Ta "Integer time client last had activity"
+.It Li "client_activity_string" Ta "" Ta "String time client last had activity"
+.It Li "client_created" Ta "" Ta "Integer time client created"
+.It Li "client_created_string" Ta "" Ta "String time client created"
+.It Li "client_cwd" Ta "" Ta "Working directory of client"
+.It Li "client_height" Ta "" Ta "Height of client"
+.It Li "client_last_session" Ta "" Ta "Name of the client's last session"
+.It Li "client_prefix" Ta "" Ta "1 if prefix key has been pressed"
+.It Li "client_readonly" Ta "" Ta "1 if client is readonly"
+.It Li "client_session" Ta "" Ta "Name of the client's session"
+.It Li "client_termname" Ta "" Ta "Terminal name of client"
+.It Li "client_tty" Ta "" Ta "Pseudo terminal of client"
+.It Li "client_utf8" Ta "" Ta "1 if client supports utf8"
+.It Li "client_width" Ta "" Ta "Width of client"
+.It Li "cursor_flag" Ta "" Ta "Pane cursor flag"
+.It Li "cursor_x" Ta "" Ta "Cursor X position in pane"
+.It Li "cursor_y" Ta "" Ta "Cursor Y position in pane"
+.It Li "history_bytes" Ta "" Ta "Number of bytes in window history"
+.It Li "history_limit" Ta "" Ta "Maximum window history lines"
+.It Li "history_size" Ta "" Ta "Size of history in bytes"
+.It Li "host" Ta "#H" Ta "Hostname of local host"
+.It Li "host_short" Ta "#h" Ta "Hostname of local host (no domain name)"
+.It Li "insert_flag" Ta "" Ta "Pane insert flag"
+.It Li "keypad_cursor_flag" Ta "" Ta "Pane keypad cursor flag"
+.It Li "keypad_flag" Ta "" Ta "Pane keypad flag"
+.It Li "line" Ta "" Ta "Line number in the list"
+.It Li "mouse_any_flag" Ta "" Ta "Pane mouse any flag"
+.It Li "mouse_button_flag" Ta "" Ta "Pane mouse button flag"
+.It Li "mouse_standard_flag" Ta "" Ta "Pane mouse standard flag"
+.It Li "mouse_utf8_flag" Ta "" Ta "Pane mouse UTF-8 flag"
+.It Li "pane_active" Ta "" Ta "1 if active pane"
+.It Li "pane_current_command" Ta "" Ta "Current command if available"
+.It Li "pane_current_path" Ta "" Ta "Current path if available"
+.It Li "pane_dead" Ta "" Ta "1 if pane is dead"
+.It Li "pane_height" Ta "" Ta "Height of pane"
+.It Li "pane_id" Ta "#D" Ta "Unique pane ID"
+.It Li "pane_in_mode" Ta "" Ta "If pane is in a mode"
+.It Li "pane_synchronized" Ta "" Ta "If pane is synchronized"
+.It Li "pane_index" Ta "#P" Ta "Index of pane"
+.It Li "pane_pid" Ta "" Ta "PID of first process in pane"
+.It Li "pane_start_command" Ta "" Ta "Command pane started with"
+.It Li "pane_start_path" Ta "" Ta "Path pane started with"
+.It Li "pane_tabs" Ta "" Ta "Pane tab positions"
+.It Li "pane_title" Ta "#T" Ta "Title of pane"
+.It Li "pane_tty" Ta "" Ta "Pseudo terminal of pane"
+.It Li "pane_width" Ta "" Ta "Width of pane"
+.It Li "saved_cursor_x" Ta "" Ta "Saved cursor X in pane"
+.It Li "saved_cursor_y" Ta "" Ta "Saved cursor Y in pane"
+.It Li "scroll_region_lower" Ta "" Ta "Bottom of scroll region in pane"
+.It Li "scroll_region_upper" Ta "" Ta "Top of scroll region in pane"
+.It Li "session_attached" Ta "" Ta "1 if session attached"
+.It Li "session_created" Ta "" Ta "Integer time session created"
+.It Li "session_created_string" Ta "" Ta "String time session created"
+.It Li "session_group" Ta "" Ta "Number of session group"
+.It Li "session_grouped" Ta "" Ta "1 if session in a group"
+.It Li "session_height" Ta "" Ta "Height of session"
+.It Li "session_id" Ta "" Ta "Unique session ID"
+.It Li "session_name" Ta "#S" Ta "Name of session"
+.It Li "session_width" Ta "" Ta "Width of session"
+.It Li "session_windows" Ta "" Ta "Number of windows in session"
+.It Li "window_active" Ta "" Ta "1 if window active"
+.It Li "window_activity_flag" Ta "" Ta "1 if window has activity alert"
+.It Li "window_bell_flag" Ta "" Ta "1 if window has bell"
+.It Li "window_content_flag" Ta "" Ta "1 if window has content alert"
+.It Li "window_find_matches" Ta "" Ta "Matched data from the find-window"
+.It Li "window_flags" Ta "#F" Ta "Window flags"
+.It Li "window_height" Ta "" Ta "Height of window"
+.It Li "window_id" Ta "" Ta "Unique window ID"
+.It Li "window_index" Ta "#I" Ta "Index of window"
+.It Li "window_layout" Ta "" Ta "Window layout description"
+.It Li "window_name" Ta "#W" Ta "Name of window"
+.It Li "window_panes" Ta "" Ta "Number of panes in window"
+.It Li "window_silence_flag" Ta "" Ta "1 if window has silence alert"
+.It Li "window_width" Ta "" Ta "Width of window"
+.It Li "wrap_flag" Ta "" Ta "Pane wrap flag"
 .El
 .Sh NAMES AND TITLES
 .Nm
@@ -3564,7 +3582,7 @@ If the command doesn't return success, the exit status is also displayed.
 .D1 (alias: Ic info )
 Show server information and terminal details.
 .It Xo Ic wait-for
-.Fl LSU
+.Op Fl L | S | U
 .Ar channel
 .Xc
 .D1 (alias: Ic wait )
@@ -3586,7 +3604,7 @@ This command only works from outside
 understands some extensions to
 .Xr terminfo 5 :
 .Bl -tag -width Ds
-.It Em Cc , Cr
+.It Em Cs , Cr
 Set the cursor colour.
 The first takes a single string argument and is used to set the colour;
 the second takes no arguments and restores the default cursor colour.
@@ -3596,7 +3614,7 @@ to change the cursor colour from inside
 .Bd -literal -offset indent
 $ printf '\e033]12;red\e033\e\e'
 .Ed
-.It Em Cs , Csr
+.It Em \&Ss , Se
 Change the cursor style.
 If set, a sequence such as this may be used
 to change the cursor to an underline:

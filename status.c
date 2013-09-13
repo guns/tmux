@@ -38,8 +38,7 @@ void	status_job_free(void *);
 void	status_job_callback(struct job *);
 char   *status_print(
 	    struct client *, struct winlink *, time_t, struct grid_cell *);
-void	status_replace1(struct client *, struct session *, struct winlink *,
-	    struct window_pane *, char **, char **, char *, size_t, int);
+void	status_replace1(struct client *, char **, char **, char *, size_t, int);
 void	status_message_callback(int, short, void *);
 
 const char *status_prompt_up_history(u_int *);
@@ -143,10 +142,8 @@ status_set_window_at(struct client *c, u_int x)
 
 	x += c->wlmouse;
 	RB_FOREACH(wl, winlinks, &s->windows) {
-		if (x < wl->status_width &&
-			session_select(s, wl->idx) == 0) {
+		if (x < wl->status_width && session_select(s, wl->idx) == 0)
 			server_redraw_session(s);
-		}
 		x -= wl->status_width + 1;
 	}
 }
@@ -384,14 +381,12 @@ out:
 
 /* Replace a single special sequence (prefixed by #). */
 void
-status_replace1(struct client *c, struct session *s, struct winlink *wl,
-    struct window_pane *wp, char **iptr, char **optr, char *out,
+status_replace1(struct client *c, char **iptr, char **optr, char *out,
     size_t outsize, int jobsflag)
 {
-	char	ch, tmp[256], *ptr, *endptr, *freeptr;
+	char	ch, tmp[256], *ptr, *endptr;
 	size_t	ptrlen;
 	long	limit;
-	u_int	idx;
 
 	errno = 0;
 	limit = strtol(*iptr, &endptr, 10);
@@ -403,8 +398,6 @@ status_replace1(struct client *c, struct session *s, struct winlink *wl,
 	if (limit <= 0)
 		limit = LONG_MAX;
 
-	freeptr = NULL;
-
 	switch (*(*iptr)++) {
 	case '(':
 		if (!jobsflag) {
@@ -413,49 +406,6 @@ status_replace1(struct client *c, struct session *s, struct winlink *wl,
 		}
 		if ((ptr = status_find_job(c, iptr)) == NULL)
 			return;
-		goto do_replace;
-	case 'D':
-		xsnprintf(tmp, sizeof tmp, "%%%u", wp->id);
-		ptr = tmp;
-		goto do_replace;
-	case 'U':
-		xsnprintf(tmp, sizeof tmp, "%s", getenv("USER"));
-		ptr = tmp;
-		goto do_replace;
-	case 'H':
-		if (gethostname(tmp, sizeof tmp) != 0)
-			fatal("gethostname failed");
-		ptr = tmp;
-		goto do_replace;
-	case 'h':
-		if (gethostname(tmp, sizeof tmp) != 0)
-			fatal("gethostname failed");
-		if ((ptr = strchr(tmp, '.')) != NULL)
-			*ptr = '\0';
-		ptr = tmp;
-		goto do_replace;
-	case 'I':
-		xsnprintf(tmp, sizeof tmp, "%d", wl->idx);
-		ptr = tmp;
-		goto do_replace;
-	case 'P':
-		if (window_pane_index(wp, &idx) != 0)
-			fatalx("index not found");
-		xsnprintf(tmp, sizeof tmp, "%u", idx);
-		ptr = tmp;
-		goto do_replace;
-	case 'S':
-		ptr = s->name;
-		goto do_replace;
-	case 'T':
-		ptr = wp->base.title;
-		goto do_replace;
-	case 'W':
-		ptr = wl->window->name;
-		goto do_replace;
-	case 'F':
-		ptr = window_printable_flags(s, wl);
-		freeptr = ptr;
 		goto do_replace;
 	case '[':
 		/*
@@ -470,6 +420,10 @@ status_replace1(struct client *c, struct session *s, struct winlink *wl,
 	case '#':
 		*(*optr)++ = '#';
 		break;
+	default:
+		xsnprintf(tmp, sizeof tmp, "#%c", *(*iptr - 1));
+		ptr = tmp;
+		goto do_replace;
 	}
 
 	return;
@@ -480,14 +434,12 @@ do_replace:
 		ptrlen = limit;
 
 	if (*optr + ptrlen >= out + outsize - 1)
-		goto out;
+		return;
 	while (ptrlen > 0 && *ptr != '\0') {
 		*(*optr)++ = *ptr++;
 		ptrlen--;
 	}
 
-out:
-	free(freeptr);
 	return;
 
 skip_to:
@@ -536,8 +488,7 @@ status_replace(struct client *c, struct session *s, struct winlink *wl,
 			*optr++ = ch;
 			continue;
 		}
-		status_replace1(
-		    c, s, wl, wp, &iptr, &optr, out, sizeof out, jobsflag);
+		status_replace1(c, &iptr, &optr, out, sizeof out, jobsflag);
 	}
 	*optr = '\0';
 
@@ -985,6 +936,7 @@ status_prompt_redraw(struct client *c)
 	off = 0;
 
 	memcpy(&gc, &grid_default_cell, sizeof gc);
+
 	/* Change colours for command mode. */
 	if (c->prompt_mdata.mode == 1) {
 		colour_set_fg(&gc, options_get_number(&s->options, "message-command-fg"));
@@ -1146,6 +1098,7 @@ status_prompt_key(struct client *c, int key)
 		}
 		break;
 	case MODEKEYEDIT_DELETE:
+	case MODEKEYEDIT_SWITCHMODESUBSTITUTE:
 		if (c->prompt_index != size) {
 			memmove(c->prompt_buffer + c->prompt_index,
 			    c->prompt_buffer + c->prompt_index + 1,
@@ -1154,11 +1107,13 @@ status_prompt_key(struct client *c, int key)
 		}
 		break;
 	case MODEKEYEDIT_DELETELINE:
+	case MODEKEYEDIT_SWITCHMODESUBSTITUTELINE:
 		*c->prompt_buffer = '\0';
 		c->prompt_index = 0;
 		c->flags |= CLIENT_STATUS;
 		break;
 	case MODEKEYEDIT_DELETETOENDOFLINE:
+	case MODEKEYEDIT_SWITCHMODECHANGELINE:
 		if (c->prompt_index < size) {
 			c->prompt_buffer[c->prompt_index] = '\0';
 			c->flags |= CLIENT_STATUS;
@@ -1236,6 +1191,11 @@ status_prompt_key(struct client *c, int key)
 			if (strchr(wsep, c->prompt_buffer[c->prompt_index]))
 				break;
 		}
+
+		/* Back up to the end-of-word like vi. */
+		if (options_get_number(oo, "status-keys") == MODEKEY_VI &&
+		    c->prompt_index != 0)
+			c->prompt_index--;
 
 		c->flags |= CLIENT_STATUS;
 		break;

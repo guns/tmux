@@ -75,6 +75,11 @@ const struct options_table_entry server_options_table[] = {
 	  .default_num = 0
 	},
 
+	{ .name = "focus-events",
+	  .type = OPTIONS_TABLE_FLAG,
+	  .default_num = 0
+	},
+
 	{ .name = "quiet",
 	  .type = OPTIONS_TABLE_FLAG,
 	  .default_num = 0 /* overridden in main() */
@@ -381,7 +386,7 @@ const struct options_table_entry session_options_table[] = {
 
 	{ .name = "status-right",
 	  .type = OPTIONS_TABLE_STRING,
-	  .default_str = "\"#22T\" %H:%M %d-%b-%y"
+	  .default_str = "\"#{=22:pane_title}\" %H:%M %d-%b-%y"
 	},
 
 	{ .name = "status-right-attr",
@@ -415,8 +420,8 @@ const struct options_table_entry session_options_table[] = {
 	  .type = OPTIONS_TABLE_STRING,
 	  .default_str = "*256col*:colors=256"
 	                 ",xterm*:XT:Ms=\\E]52;%p1%s;%p2%s\\007"
-	                 ":Cc=\\E]12;%p1%s\\007:Cr=\\E]112\\007"
-			 ":Cs=\\E[%p1%d q:Csr=\\E[2 q,screen*:XT"
+	                 ":Cs=\\E]12;%p1%s\\007:Cr=\\E]112\\007"
+			 ":Ss=\\E[%p1%d q:Se=\\E[2 q,screen*:XT"
 	},
 
 	{ .name = "update-environment",
@@ -474,6 +479,11 @@ const struct options_table_entry window_options_table[] = {
 	{ .name = "automatic-rename",
 	  .type = OPTIONS_TABLE_FLAG,
 	  .default_num = 1
+	},
+
+	{ .name = "automatic-rename-format",
+	  .type = OPTIONS_TABLE_STRING,
+	  .default_str = "#{?pane_in_mode,[tmux],#{pane_current_command}}#{?pane_dead,[dead],}"
 	},
 
 	{ .name = "c0-change-trigger",

@@ -219,8 +219,13 @@ tty_start_tty(struct tty *tty)
 	if (tty_term_has(tty->term, TTYC_KMOUS))
 		tty_puts(tty, "\033[?1000l\033[?1006l\033[?1005l");
 
-	if (tty_term_has(tty->term, TTYC_XT))
-		tty_puts(tty, "\033[c\033[>4;1m\033[?1004h\033[m");
+	if (tty_term_has(tty->term, TTYC_XT)) {
+		if (options_get_number(&global_options, "focus-events")) {
+			tty->flags |= TTY_FOCUS;
+			tty_puts(tty, "\033[?1004h");
+		}
+		tty_puts(tty, "\033[c\033[>4;1m\033[m");
+	}
 
 	tty->cx = UINT_MAX;
 	tty->cy = UINT_MAX;
@@ -270,11 +275,11 @@ tty_stop_tty(struct tty *tty)
 	tty_raw(tty, tty_term_string(tty->term, TTYC_SGR0));
 	tty_raw(tty, tty_term_string(tty->term, TTYC_RMKX));
 	tty_raw(tty, tty_term_string(tty->term, TTYC_CLEAR));
-	if (tty_term_has(tty->term, TTYC_CS1) && tty->cstyle != 0) {
-		if (tty_term_has(tty->term, TTYC_CSR1))
-			tty_raw(tty, tty_term_string(tty->term, TTYC_CSR1));
+	if (tty_term_has(tty->term, TTYC_SS) && tty->cstyle != 0) {
+		if (tty_term_has(tty->term, TTYC_SE))
+			tty_raw(tty, tty_term_string(tty->term, TTYC_SE));
 		else
-			tty_raw(tty, tty_term_string1(tty->term, TTYC_CS1, 0));
+			tty_raw(tty, tty_term_string1(tty->term, TTYC_SS, 0));
 	}
 	tty_raw(tty, tty_term_string(tty->term, TTYC_CR));
 
@@ -282,8 +287,13 @@ tty_stop_tty(struct tty *tty)
 	if (tty_term_has(tty->term, TTYC_KMOUS))
 		tty_raw(tty, "\033[?1000l\033[?1006l\033[?1005l");
 
-	if (tty_term_has(tty->term, TTYC_XT))
-		tty_raw(tty, "\033[>4m\033[?1004l\033[m");
+	if (tty_term_has(tty->term, TTYC_XT)) {
+		if (tty->flags & TTY_FOCUS) {
+			tty->flags &= ~TTY_FOCUS;
+			tty_puts(tty, "\033[?1004l");
+		}
+		tty_raw(tty, "\033[>4m\033[m");
+	}
 
 	tty_raw(tty, tty_term_string(tty->term, TTYC_RMCUP));
 
@@ -455,7 +465,7 @@ tty_force_cursor_colour(struct tty *tty, const char *ccolour)
 	if (*ccolour == '\0')
 		tty_putcode(tty, TTYC_CR);
 	else
-		tty_putcode_ptr1(tty, TTYC_CC, ccolour);
+		tty_putcode_ptr1(tty, TTYC_CS, ccolour);
 	free(tty->ccolour);
 	tty->ccolour = xstrdup(ccolour);
 }
@@ -479,12 +489,12 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 			tty_putcode(tty, TTYC_CIVIS);
 	}
 	if (tty->cstyle != s->cstyle) {
-		if (tty_term_has(tty->term, TTYC_CS1)) {
+		if (tty_term_has(tty->term, TTYC_SS)) {
 			if (s->cstyle == 0 &&
-			    tty_term_has(tty->term, TTYC_CSR1))
-				tty_putcode(tty, TTYC_CSR1);
+			    tty_term_has(tty->term, TTYC_SE))
+				tty_putcode(tty, TTYC_SE);
 			else
-				tty_putcode1(tty, TTYC_CS1, s->cstyle);
+				tty_putcode1(tty, TTYC_SS, s->cstyle);
 		}
 		tty->cstyle = s->cstyle;
 	}
