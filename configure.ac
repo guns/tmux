@@ -4,7 +4,7 @@
 AC_INIT(tmux, 1.9)
 
 AC_CONFIG_AUX_DIR(etc)
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign subdir-objects])
 
 AC_CANONICAL_HOST
 
@@ -135,7 +135,7 @@ fi
 # Look for curses.
 AC_SEARCH_LIBS(
 	setupterm,
-	[terminfo curses ncurses],
+	[terminfo curses ncurses tinfo],
 	found_curses=yes,
 	found_curses=no
 )
