@@ -17,4 +17,6 @@ Makefile
 Makefile.in
 configure
 tmux.1.*
-terminfo/
+/terminfo
+/pkg
+/*.tar.xz*
