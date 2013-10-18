@@ -34,7 +34,7 @@ task :configure do
   sh *cmd
 end
 
-desc 'Create / update custum terminfo files'
+desc 'Create / update custom terminfo files'
 task :terminfo do
   join = lambda { |es| es.map { |e| "\t#{e},\n" }.join }
   mkdir_p 'terminfo', :verbose => false
@@ -50,6 +50,7 @@ task :terminfo do
 
       # Italics support (from FAQ)
       buf.sub! /^screen/, 'tmux'
+      buf.sub! /\|screen/, '|tmux'
       buf.sub! /%\?%p1%t;3%/, '%?%p1%t;7%'
       buf.sub! /smso=[^,]*,/, 'smso=\\E[7m,'
       buf.sub! /rmso=[^,]*,/, 'rmso=\\E[27m,'
