@@ -1,6 +1,6 @@
 # Maintainer: Sung Pae <self@sungpae.com>
 pkgname=tmux-guns
-pkgver=1.8.170.g2058e7a
+pkgver=1.8.239.gebbcf1b
 pkgrel=1
 pkgdesc="Sung Pae's tmux build"
 arch=('x86_64')
@@ -9,6 +9,7 @@ license=('BSD')
 groups=('guns')
 depends=('ncurses' 'libevent')
 makedepends=('git')
+conflicts=('tmux')
 
 pkgver() {
     printf %s "$(git describe --long | tr - .)"
