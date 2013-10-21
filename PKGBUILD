@@ -1,6 +1,6 @@
 # Maintainer: Sung Pae <self@sungpae.com>
 pkgname=tmux-guns
-pkgver=1.8.239.gebbcf1b
+pkgver=1.8.240.ga702e76
 pkgrel=1
 pkgdesc="Sung Pae's tmux build"
 arch=('x86_64')
@@ -9,6 +9,7 @@ license=('BSD')
 groups=('guns')
 depends=('ncurses' 'libevent')
 makedepends=('git')
+provides=('tmux')
 conflicts=('tmux')
 
 pkgver() {
