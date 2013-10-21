@@ -8,7 +8,7 @@ url="https://github.com/guns/tmux"
 license=('BSD')
 groups=('guns')
 depends=('ncurses' 'libevent')
-makedepends=('git')
+makedepends=('git' 'ruby')
 provides=('tmux')
 conflicts=('tmux')
 
