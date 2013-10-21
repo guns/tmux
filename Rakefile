@@ -12,24 +12,12 @@ desc 'Configure tmux'
 task :configure do
   sh '/bin/sh autogen.sh' unless File.executable? 'configure'
 
-  ENV['CFLAGS' ] ||= ''
-  ENV['LDFLAGS'] ||= ''
-  ENV['LDFLAGS']  += ' -lresolv '
-
   cmd = %W[
     ./configure
     --prefix=#{ENV['PREFIX'] || '/opt/tmux'}
   ]
 
-  if RUBY_PLATFORM =~ /darwin/i and sh '/bin/sh -c "command -v brew" &>/dev/null'
-    pre = %x(brew --prefix libevent).chomp
-    ENV['CFLAGS' ] += " -I#{pre}/include "
-    ENV['LDFLAGS'] += " -L#{pre}/lib "
-  end
-
-  if ENV['DEBUG']
-    cmd << '--enable-debug'
-  end
+  cmd << '--enable-debug' if ENV['DEBUG']
 
   sh *cmd
 end
