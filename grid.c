@@ -37,7 +37,6 @@
 
 /* Default grid cell data. */
 const struct grid_cell grid_default_cell = { 0, 0, 8, 8, (1 << 4) | 1, " " };
-const struct grid_cell grid_marker_cell = { 0, 0, 8, 8, (1 << 4) | 1, "_" };
 
 #define grid_put_cell(gd, px, py, gc) do {			\
 	memcpy(&gd->linedata[py].celldata[px], 			\
@@ -124,7 +123,7 @@ grid_compare(struct grid *ga, struct grid *gb)
 	struct grid_cell	*gca, *gcb;
 	u_int			 xx, yy;
 
-	if (ga->sx != gb->sx || ga->sy != ga->sy)
+	if (ga->sx != gb->sx || ga->sy != gb->sy)
 		return (1);
 
 	for (yy = 0; yy < ga->sy; yy++) {
@@ -644,7 +643,7 @@ grid_string_cells(struct grid *gd, u_int px, u_int py, u_int nx,
         if (trim) {
 		while (off > 0 && buf[off - 1] == ' ')
 			off--;
-        }
+	}
 	buf[off] = '\0';
 
 	return (buf);
@@ -750,7 +749,7 @@ grid_reflow_split(struct grid *dst, u_int *py, struct grid_line *src_gl,
 		dst_gl->flags |= GRID_LINE_WRAPPED;
 
 		/* Copy the data. */
-		memcpy (&dst_gl->celldata[0], &src_gl->celldata[offset],
+		memcpy(&dst_gl->celldata[0], &src_gl->celldata[offset],
 		    to_copy * sizeof dst_gl->celldata[0]);
 
 		/* Move offset and reduce old line size. */

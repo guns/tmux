@@ -60,7 +60,7 @@ __dead void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-28lquvV] [-c shell-command] [-f file] [-L socket-name]\n"
+	    "usage: %s [-2lquvV] [-c shell-command] [-f file] [-L socket-name]\n"
 	    "            [-S socket-path] [command [flags]]\n",
 	    __progname);
 	exit(1);
@@ -205,8 +205,9 @@ int
 main(int argc, char **argv)
 {
 	struct passwd	*pw;
-	char		*s, *path, *label, *home, **var, tmp[MAXPATHLEN];
+	char		*s, *path, *label, **var, tmp[MAXPATHLEN];
 	char		 in[256];
+	const char	*home;
 	long long	 pid;
 	int	 	 opt, flags, quiet, keys, session;
 
@@ -331,11 +332,15 @@ main(int argc, char **argv)
 			pw = getpwuid(getuid());
 			if (pw != NULL)
 				home = pw->pw_dir;
+			else
+				home = NULL;
 		}
-		xasprintf(&cfg_file, "%s/.tmux.conf", home);
-		if (access(cfg_file, R_OK) != 0 && errno == ENOENT) {
-			free(cfg_file);
-			cfg_file = NULL;
+		if (home != NULL) {
+			xasprintf(&cfg_file, "%s/.tmux.conf", home);
+			if (access(cfg_file, R_OK) != 0 && errno == ENOENT) {
+				free(cfg_file);
+				cfg_file = NULL;
+			}
 		}
 	}
 
@@ -367,7 +372,11 @@ main(int argc, char **argv)
 		}
 	}
 	free(label);
-	strlcpy(socket_path, path, sizeof socket_path);
+
+	if (strlcpy(socket_path, path, sizeof socket_path) >= sizeof socket_path) {
+		fprintf(stderr, "socket path too long: %s\n", path);
+		exit(1);
+	}
 	free(path);
 
 #ifdef HAVE_SETPROCTITLE

@@ -72,7 +72,7 @@ cmd_load_buffer_exec(struct cmd *self, struct cmd_q *cmdq)
 		buffer_ptr = xmalloc(sizeof *buffer_ptr);
 		*buffer_ptr = buffer;
 
-		error = server_set_stdin_callback (c, cmd_load_buffer_callback,
+		error = server_set_stdin_callback(c, cmd_load_buffer_callback,
 		    buffer_ptr, &cause);
 		if (error != 0) {
 			cmdq_error(cmdq, "%s: %s", path, cause);
@@ -169,6 +169,7 @@ cmd_load_buffer_callback(struct client *c, int closed, void *data)
 		/* No context so can't use server_client_msg_error. */
 		evbuffer_add_printf(c->stderr_data, "no buffer %d\n", *buffer);
 		server_push_stderr(c);
+		free(pdata);
 	}
 
 	free(data);

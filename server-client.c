@@ -67,9 +67,9 @@ server_client_create(int fd)
 	c->cmdq = cmdq_new(c);
 	c->cmdq->client_exit = 1;
 
-	c->stdin_data = evbuffer_new ();
-	c->stdout_data = evbuffer_new ();
-	c->stderr_data = evbuffer_new ();
+	c->stdin_data = evbuffer_new();
+	c->stdout_data = evbuffer_new();
+	c->stderr_data = evbuffer_new();
 
 	c->tty.fd = -1;
 	c->title = NULL;
@@ -122,7 +122,7 @@ server_client_open(struct client *c, struct session *s, char **cause)
 		return (0);
 
 	if (!(c->flags & CLIENT_TERMINAL)) {
-		*cause = xstrdup ("not a terminal");
+		*cause = xstrdup("not a terminal");
 		return (-1);
 	}
 
@@ -173,7 +173,7 @@ server_client_lost(struct client *c)
 		evtimer_del(&c->identify_timer);
 
 	free(c->message_string);
-	if (event_initialized (&c->message_timer))
+	if (event_initialized(&c->message_timer))
 		evtimer_del(&c->message_timer);
 	for (i = 0; i < ARRAY_LENGTH(&c->message_log); i++) {
 		msg = &ARRAY_ITEM(&c->message_log, i);
@@ -279,7 +279,7 @@ server_client_status_timer(void)
 		interval = options_get_number(&s->options, "status-interval");
 
 		difference = tv.tv_sec - c->status_timer.tv_sec;
-		if (difference >= interval) {
+		if (interval != 0 && difference >= interval) {
 			status_update_jobs(c);
 			c->flags |= CLIENT_STATUS;
 		}
@@ -323,9 +323,9 @@ server_client_check_mouse(struct client *c, struct window_pane *wp)
 	else if (statusat > 0 && m->y >= (u_int)statusat)
 		m->y = statusat - 1;
 
-	/* Is this a pane selection? Allow down only in copy mode. */
+	/* Is this a pane selection? */
 	if (options_get_number(oo, "mouse-select-pane") &&
-	    (m->event == MOUSE_EVENT_DOWN || wp->mode != &window_copy_mode)) {
+	    (m->event == MOUSE_EVENT_DOWN || m->event == MOUSE_EVENT_WHEEL)) {
 		window_set_active_at(wp->window, m->x, m->y);
 		server_redraw_window_borders(wp->window);
 		wp = wp->window->active; /* may have changed */
@@ -742,7 +742,7 @@ server_client_check_redraw(struct client *c)
 	}
 
 	if (c->flags & CLIENT_REDRAW) {
-		screen_redraw_screen(c, 0, 0);
+		screen_redraw_screen(c, 1, 1, 1);
 		c->flags &= ~(CLIENT_STATUS|CLIENT_BORDERS);
 	} else if (c->flags & CLIENT_REDRAWWINDOW) {
 		TAILQ_FOREACH(wp, &c->session->curw->window->panes, entry)
@@ -756,10 +756,10 @@ server_client_check_redraw(struct client *c)
 	}
 
 	if (c->flags & CLIENT_BORDERS)
-		screen_redraw_screen(c, 0, 1);
+		screen_redraw_screen(c, 0, 0, 1);
 
 	if (c->flags & CLIENT_STATUS)
-		screen_redraw_screen(c, 1, 0);
+		screen_redraw_screen(c, 0, 1, 0);
 
 	c->tty.flags |= flags;
 

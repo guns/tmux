@@ -1354,8 +1354,7 @@ tty_attributes(struct tty *tty, const struct grid_cell *gc)
 		tty_putcode(tty, TTYC_BOLD);
 	if (changed & GRID_ATTR_DIM)
 		tty_putcode(tty, TTYC_DIM);
-	if (changed & GRID_ATTR_ITALICS)
-	{
+	if (changed & GRID_ATTR_ITALICS) {
 		if (tty_term_has(tty->term, TTYC_SITM))
 			tty_putcode(tty, TTYC_SITM);
 		else
@@ -1582,13 +1581,29 @@ tty_try_256(struct tty *tty, u_char colour, const char *type)
 {
 	char	s[32];
 
-	if (!(tty->term->flags & TERM_256COLOURS) &&
-	    !(tty->term_flags & TERM_256COLOURS))
-		return (-1);
+	/*
+	 * If the terminfo entry has 256 colours, assume that setaf and setab
+	 * work correctly.
+	 */
+	if (tty->term->flags & TERM_256COLOURS) {
+		if (*type == '3')
+			tty_putcode1(tty, TTYC_SETAF, colour);
+		else
+			tty_putcode1(tty, TTYC_SETAB, colour);
+		return (0);
+	}
 
-	xsnprintf(s, sizeof s, "\033[%s;5;%hhum", type, colour);
-	tty_puts(tty, s);
-	return (0);
+	/*
+	 * If the user has specified -2 to the client, setaf and setab may not
+	 * work, so send the usual sequence.
+	 */
+	if (tty->term_flags & TERM_256COLOURS) {
+		xsnprintf(s, sizeof s, "\033[%s;5;%hhum", type, colour);
+		tty_puts(tty, s);
+		return (0);
+	}
+
+	return (-1);
 }
 
 void
