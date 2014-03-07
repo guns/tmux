@@ -32,6 +32,10 @@
 #include <stdio.h>
 #include <termios.h>
 
+#ifdef HAVE_UTEMPTER
+#include <utempter.h>
+#endif
+
 #include "array.h"
 
 #include "compat.h"
@@ -513,14 +517,18 @@ enum mode_key_cmd {
 
 	/* Menu (choice) keys. */
 	MODEKEYCHOICE_BACKSPACE,
+	MODEKEYCHOICE_BOTTOMLINE,
 	MODEKEYCHOICE_CANCEL,
 	MODEKEYCHOICE_CHOOSE,
 	MODEKEYCHOICE_DOWN,
+	MODEKEYCHOICE_ENDOFLIST,
 	MODEKEYCHOICE_PAGEDOWN,
 	MODEKEYCHOICE_PAGEUP,
 	MODEKEYCHOICE_SCROLLDOWN,
 	MODEKEYCHOICE_SCROLLUP,
 	MODEKEYCHOICE_STARTNUMBERPREFIX,
+	MODEKEYCHOICE_STARTOFLIST,
+	MODEKEYCHOICE_TOPLINE,
 	MODEKEYCHOICE_TREE_COLLAPSE,
 	MODEKEYCHOICE_TREE_COLLAPSE_ALL,
 	MODEKEYCHOICE_TREE_EXPAND,
@@ -529,6 +537,7 @@ enum mode_key_cmd {
 	MODEKEYCHOICE_UP,
 
 	/* Copy keys. */
+	MODEKEYCOPY_APPENDSELECTION,
 	MODEKEYCOPY_BACKTOINDENTATION,
 	MODEKEYCOPY_BOTTOMLINE,
 	MODEKEYCOPY_CANCEL,
@@ -1075,6 +1084,8 @@ struct session {
 #define SESSION_UNATTACHED 0x1	/* not attached to any clients */
 	int		 flags;
 
+	u_int            attached;
+
 	struct termios	*tio;
 
 	struct environ	 environ;
@@ -1114,19 +1125,27 @@ struct tty_term {
 };
 LIST_HEAD(tty_terms, tty_term);
 
+/* Mouse button masks. */
+#define MOUSE_MASK_BUTTONS 3
+#define MOUSE_MASK_SHIFT 4
+#define MOUSE_MASK_META 8
+#define MOUSE_MASK_CTRL 16
+#define MOUSE_MASK_DRAG 32
+#define MOUSE_MASK_WHEEL 64
+
 /* Mouse wheel states. */
 #define MOUSE_WHEEL_UP 0
 #define MOUSE_WHEEL_DOWN 1
 
-/* Mouse events. */
-#define MOUSE_EVENT_DOWN (1 << 0)
-#define MOUSE_EVENT_DRAG (1 << 1)
-#define MOUSE_EVENT_UP (1 << 2)
-#define MOUSE_EVENT_CLICK (1 << 3)
-#define MOUSE_EVENT_WHEEL (1 << 4)
+/* Mouse event bits. */
+#define MOUSE_EVENT_DOWN 0x1
+#define MOUSE_EVENT_DRAG 0x2
+#define MOUSE_EVENT_UP 0x4
+#define MOUSE_EVENT_CLICK 0x8
+#define MOUSE_EVENT_WHEEL 0x10
 
-/* Mouse flags. */
-#define MOUSE_RESIZE_PANE (1 << 0)
+/* Mouse flag bits. */
+#define MOUSE_RESIZE_PANE 0x1
 
 /*
  * Mouse input. When sent by xterm:
@@ -1706,10 +1725,6 @@ char		*paste_print(struct paste_buffer *, size_t);
 void		 paste_send_pane(struct paste_buffer *, struct window_pane *,
 		     const char *, int);
 
-/* clock.c */
-extern const char clock_table[14][5][5];
-void		 clock_draw(struct screen_write_ctx *, int, int);
-
 /* arguments.c */
 int		 args_cmp(struct args_entry *, struct args_entry *);
 RB_PROTOTYPE(args_tree, args_entry, entry, args_cmp);
@@ -2215,6 +2230,7 @@ void		 layout_set_active_changed(struct window *);
 
 /* window-clock.c */
 extern const struct window_mode window_clock_mode;
+extern const char window_clock_table[14][5][5];
 
 /* window-copy.c */
 extern const struct window_mode window_copy_mode;

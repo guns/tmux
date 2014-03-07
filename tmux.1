@@ -855,6 +855,7 @@ option).
 The following keys are supported as appropriate for the mode:
 .Bl -column "FunctionXXXXXXXXXXXXXXXXX" "viXXXXXXXXXX" "emacs" -offset indent
 .It Sy "Function" Ta Sy "vi" Ta Sy "emacs"
+.It Li "Append selection" Ta "A" Ta ""
 .It Li "Back to indentation" Ta "^" Ta "M-m"
 .It Li "Bottom of history" Ta "G" Ta "M-<"
 .It Li "Clear selection" Ta "Escape" Ta "C-g"
@@ -3141,13 +3142,14 @@ The following variables are available, where appropriate:
 .It Li "saved_cursor_y" Ta "" Ta "Saved cursor Y in pane"
 .It Li "scroll_region_lower" Ta "" Ta "Bottom of scroll region in pane"
 .It Li "scroll_region_upper" Ta "" Ta "Top of scroll region in pane"
-.It Li "session_attached" Ta "" Ta "1 if session attached"
+.It Li "session_attached" Ta "" Ta "Number of clients session is attached to"
 .It Li "session_created" Ta "" Ta "Integer time session created"
 .It Li "session_created_string" Ta "" Ta "String time session created"
 .It Li "session_group" Ta "" Ta "Number of session group"
 .It Li "session_grouped" Ta "" Ta "1 if session in a group"
 .It Li "session_height" Ta "" Ta "Height of session"
 .It Li "session_id" Ta "" Ta "Unique session ID"
+.It Li "session_many_attached" Ta "" Ta "1 if multiple clients attached"
 .It Li "session_name" Ta "#S" Ta "Name of session"
 .It Li "session_width" Ta "" Ta "Width of session"
 .It Li "session_windows" Ta "" Ta "Number of windows in session"
@@ -3547,12 +3549,16 @@ The
 .Fl a
 option appends to rather than overwriting the file.
 .It Xo Ic set-buffer
+.Op Fl a
 .Op Fl b Ar buffer-index
 .Ar data
 .Xc
 .D1 (alias: Ic setb )
 Set the contents of the specified buffer to
 .Ar data .
+The
+.Fl a
+option appends to rather than overwriting the buffer.
 .It Xo Ic show-buffer
 .Op Fl b Ar buffer-index
 .Xc

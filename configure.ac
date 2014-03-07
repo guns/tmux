@@ -1,7 +1,7 @@
 # $Id$
 
 # Miscellaneous autofoo bullshit.
-AC_INIT(tmux, 1.9a)
+AC_INIT(tmux, 1.10)
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([foreign subdir-objects])
@@ -45,7 +45,7 @@ AC_CHECK_HEADERS(
 )
 
 # Is this a debug build?
-#found_debug=yes
+found_debug=yes
 AC_ARG_ENABLE(
 	debug,
 	AC_HELP_STRING(--enable-debug, create a debug build),
@@ -142,6 +142,13 @@ AC_SEARCH_LIBS(
 )
 if test "x$found_curses" = xno; then
     AC_MSG_ERROR("curses not found")
+fi
+
+# Look for utempter.
+AC_CHECK_HEADER(utempter.h, have_utempter=yes, have_utempter=no)
+if test "x$have_utempter" = xyes; then
+   AC_DEFINE(HAVE_UTEMPTER)
+   LIBS="$LIBS -lutempter"
 fi
 
 # Check for b64_ntop.

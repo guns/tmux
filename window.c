@@ -420,10 +420,15 @@ window_pane_active_set(struct window_pane *wp, struct window_pane *nextwp)
 void
 window_pane_active_lost(struct window_pane *wp, struct window_pane *nextwp)
 {
-	struct layout_cell	*lc, *lc2;
+	struct layout_cell	*lc, *lc2, *lcparent;
+
+	/* Get the parent cell. */
+	lcparent = nextwp->layout_cell->parent;
+	if (lcparent == NULL)
+		return;
 
 	/* Save the target pane in its parent. */
-	nextwp->layout_cell->parent->lastwp = nextwp;
+	lcparent->lastwp = nextwp;
 
 	/*
 	 * Save the source pane in all of its parents up to, but not including,
@@ -432,8 +437,7 @@ window_pane_active_lost(struct window_pane *wp, struct window_pane *nextwp)
 	if (wp == NULL)
 		return;
 	for (lc = wp->layout_cell->parent; lc != NULL; lc = lc->parent) {
-		lc2 = nextwp->layout_cell->parent;
-		for (; lc2 != NULL; lc2 = lc2->parent) {
+		for (lc2 = lcparent; lc2 != NULL; lc2 = lc2->parent) {
 			if (lc == lc2)
 				return;
 		}
@@ -779,6 +783,9 @@ window_pane_destroy(struct window_pane *wp)
 		evtimer_del(&wp->changes_timer);
 
 	if (wp->fd != -1) {
+#ifdef HAVE_UTEMPTER
+		utempter_remove_record(wp->fd);
+#endif
 		bufferevent_free(wp->event);
 		close(wp->fd);
 	}
@@ -810,6 +817,9 @@ window_pane_spawn(struct window_pane *wp, const char *cmd, const char *shell,
 	char		*argv0, paneid[16];
 	const char	*ptr;
 	struct termios	 tio2;
+#ifdef HAVE_UTEMPTER
+	char		 s[32];
+#endif
 
 	if (wp->fd != -1) {
 		bufferevent_free(wp->event);
@@ -888,6 +898,11 @@ window_pane_spawn(struct window_pane *wp, const char *cmd, const char *shell,
 		execl(wp->shell, argv0, (char *) NULL);
 		fatal("execl failed");
 	}
+
+#ifdef HAVE_UTEMPTER
+	xsnprintf(s, sizeof s, "tmux(%lu).%%%u", (long) getpid(), wp->id);
+	utempter_add_record(wp->fd, s);
+#endif
 
 	setblocking(wp->fd, 0);
 
