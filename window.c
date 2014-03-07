@@ -420,13 +420,10 @@ window_pane_active_set(struct window_pane *wp, struct window_pane *nextwp)
 void
 window_pane_active_lost(struct window_pane *wp, struct window_pane *nextwp)
 {
-	struct layout_cell	*lc, *lc2, *lcparent;
-
-	if ((lcparent = nextwp->layout_cell->parent) == NULL)
-		return;
+	struct layout_cell	*lc, *lc2;
 
 	/* Save the target pane in its parent. */
-	lcparent->lastwp = nextwp;
+	nextwp->layout_cell->parent->lastwp = nextwp;
 
 	/*
 	 * Save the source pane in all of its parents up to, but not including,
@@ -435,7 +432,7 @@ window_pane_active_lost(struct window_pane *wp, struct window_pane *nextwp)
 	if (wp == NULL)
 		return;
 	for (lc = wp->layout_cell->parent; lc != NULL; lc = lc->parent) {
-		lc2 = lcparent;
+		lc2 = nextwp->layout_cell->parent;
 		for (; lc2 != NULL; lc2 = lc2->parent) {
 			if (lc == lc2)
 				return;
