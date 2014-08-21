@@ -194,10 +194,10 @@ int
 format_replace(struct format_tree *ft, const char *key, size_t keylen,
     char **buf, size_t *len, size_t *off)
 {
-	char		*copy, *copy0, *endptr, *ptr, *saved;
+	char		*copy, *copy0, *endptr, *ptr, *saved, *trimmed;
 	const char	*value;
 	size_t		 valuelen;
-	u_long		 limit = ULONG_MAX;
+	u_long		 limit = 0;
 
 	/* Make a copy of the key. */
 	copy0 = copy = xmalloc(keylen + 1);
@@ -256,11 +256,14 @@ format_replace(struct format_tree *ft, const char *key, size_t keylen,
 			value = "";
 		saved = NULL;
 	}
-	valuelen = strlen(value);
 
 	/* Truncate the value if needed. */
-	if (valuelen > limit)
-		valuelen = limit;
+	if (limit != 0) {
+		value = trimmed = utf8_trimcstr(value, limit);
+		free(saved);
+		saved = trimmed;
+	}
+	valuelen = strlen(value);
 
 	/* Expand the buffer and copy in the value. */
 	while (*len - *off < valuelen + 1) {
@@ -365,7 +368,7 @@ format_get_command(struct window_pane *wp)
 	cmd = osdep_get_name(wp->fd, wp->tty);
 	if (cmd == NULL || *cmd == '\0') {
 		free(cmd);
-		cmd = xstrdup(wp->cmd);
+		cmd = cmd_stringify_argv(wp->argc, wp->argv);
 		if (cmd == NULL || *cmd == '\0') {
 			free(cmd);
 			cmd = xstrdup(wp->shell);
@@ -487,8 +490,6 @@ format_winlink(struct format_tree *ft, struct session *s, struct winlink *wl)
 
 	format_add(ft, "window_bell_flag", "%u",
 	    !!(wl->flags & WINLINK_BELL));
-	format_add(ft, "window_content_flag", "%u",
-	    !!(wl->flags & WINLINK_CONTENT));
 	format_add(ft, "window_activity_flag", "%u",
 	    !!(wl->flags & WINLINK_ACTIVITY));
 	format_add(ft, "window_silence_flag", "%u",
@@ -551,6 +552,13 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 	format_add(ft, "pane_active", "%d", wp == wp->window->active);
 	format_add(ft, "pane_dead", "%d", wp->fd == -1);
 
+	if (window_pane_visible(wp)) {
+		format_add(ft, "pane_left", "%u", wp->xoff);
+		format_add(ft, "pane_top", "%u", wp->yoff);
+		format_add(ft, "pane_right", "%u", wp->xoff + wp->sx - 1);
+		format_add(ft, "pane_bottom", "%u", wp->yoff + wp->sy - 1);
+	}
+
 	format_add(ft, "pane_in_mode", "%d", wp->screen != &wp->base);
 	format_add(ft, "pane_synchronized", "%d",
 	    !!options_get_number(&wp->window->options, "synchronize-panes"));
@@ -558,10 +566,12 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 	if (wp->tty != NULL)
 		format_add(ft, "pane_tty", "%s", wp->tty);
 	format_add(ft, "pane_pid", "%ld", (long) wp->pid);
-	if (wp->cmd != NULL)
-		format_add(ft, "pane_start_command", "%s", wp->cmd);
 	if ((cwd = osdep_get_cwd(wp->fd)) != NULL)
 		format_add(ft, "pane_current_path", "%s", cwd);
+	if ((cmd = cmd_stringify_argv(wp->argc, wp->argv)) != NULL) {
+		format_add(ft, "pane_start_command", "%s", cmd);
+		free(cmd);
+	}
 	if ((cmd = format_get_command(wp)) != NULL) {
 		format_add(ft, "pane_current_command", "%s", cmd);
 		free(cmd);
@@ -593,8 +603,6 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 	    !!(wp->base.mode & MODE_MOUSE_STANDARD));
 	format_add(ft, "mouse_button_flag", "%d",
 	    !!(wp->base.mode & MODE_MOUSE_BUTTON));
-	format_add(ft, "mouse_any_flag", "%d",
-	    !!(wp->base.mode & MODE_MOUSE_ANY));
 	format_add(ft, "mouse_utf8_flag", "%d",
 	    !!(wp->base.mode & MODE_MOUSE_UTF8));
 
@@ -603,12 +611,15 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 
 /* Set default format keys for paste buffer. */
 void
-format_paste_buffer(struct format_tree *ft, struct paste_buffer *pb)
+format_paste_buffer(struct format_tree *ft, struct paste_buffer *pb,
+    int utf8flag)
 {
-	char	*pb_print = paste_print(pb, 50);
+	char	*s;
 
 	format_add(ft, "buffer_size", "%zu", pb->size);
-	format_add(ft, "buffer_sample", "%s", pb_print);
+	format_add(ft, "buffer_name", "%s", pb->name);
 
-	free(pb_print);
+	s = paste_make_sample(pb, utf8flag);
+	format_add(ft, "buffer_sample", "%s", s);
+	free(s);
 }

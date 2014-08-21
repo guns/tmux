@@ -128,7 +128,7 @@ tty_set_size(struct tty *tty, u_int sx, u_int sy) {
 }
 
 int
-tty_open(struct tty *tty, const char *overrides, char **cause)
+tty_open(struct tty *tty, char **cause)
 {
 	char	out[64];
 	int	fd;
@@ -141,7 +141,7 @@ tty_open(struct tty *tty, const char *overrides, char **cause)
 		tty->log_fd = fd;
 	}
 
-	tty->term = tty_term_find(tty->termname, tty->fd, overrides, cause);
+	tty->term = tty_term_find(tty->termname, tty->fd, cause);
 	if (tty->term == NULL) {
 		tty_close(tty);
 		return (-1);
@@ -193,7 +193,7 @@ tty_init_termios(int fd, struct termios *orig_tio, struct bufferevent *bufev)
 	tio.c_iflag |= IGNBRK;
 	tio.c_oflag &= ~(OPOST|ONLCR|OCRNL|ONLRET);
 	tio.c_lflag &= ~(IEXTEN|ICANON|ECHO|ECHOE|ECHONL|ECHOCTL|
-	    ECHOPRT|ECHOKE|ECHOCTL|ISIG);
+	    ECHOPRT|ECHOKE|ISIG);
 	tio.c_cc[VMIN] = 1;
 	tio.c_cc[VTIME] = 0;
 	if (tcsetattr(fd, TCSANOW, &tio) == 0)
@@ -388,7 +388,8 @@ tty_putcode_ptr1(struct tty *tty, enum tty_code_code code, const void *a)
 }
 
 void
-tty_putcode_ptr2(struct tty *tty, enum tty_code_code code, const void *a, const void *b)
+tty_putcode_ptr2(struct tty *tty, enum tty_code_code code, const void *a,
+    const void *b)
 {
 	if (a != NULL && b != NULL)
 		tty_puts(tty, tty_term_ptr2(tty->term, code, a, b));
@@ -512,16 +513,12 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 				tty_puts(tty, "\033[?1005l");
 			tty_puts(tty, "\033[?1006h");
 
-			if (mode & MODE_MOUSE_ANY)
-				tty_puts(tty, "\033[?1003h");
-			else if (mode & MODE_MOUSE_BUTTON)
+			if (mode & MODE_MOUSE_BUTTON)
 				tty_puts(tty, "\033[?1002h");
 			else if (mode & MODE_MOUSE_STANDARD)
 				tty_puts(tty, "\033[?1000h");
 		} else {
-			if (tty->mode & MODE_MOUSE_ANY)
-				tty_puts(tty, "\033[?1003l");
-			else if (tty->mode & MODE_MOUSE_BUTTON)
+			if (tty->mode & MODE_MOUSE_BUTTON)
 				tty_puts(tty, "\033[?1002l");
 			else if (tty->mode & MODE_MOUSE_STANDARD)
 				tty_puts(tty, "\033[?1000l");
@@ -547,8 +544,8 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 }
 
 void
-tty_emulate_repeat(
-    struct tty *tty, enum tty_code_code code, enum tty_code_code code1, u_int n)
+tty_emulate_repeat(struct tty *tty, enum tty_code_code code,
+    enum tty_code_code code1, u_int n)
 {
 	if (tty_term_has(tty->term, code))
 		tty_putcode1(tty, code, n);

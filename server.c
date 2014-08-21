@@ -50,8 +50,6 @@ int		 server_shutdown;
 struct event	 server_ev_accept;
 struct event	 server_ev_second;
 
-struct paste_stack global_buffers;
-
 int		 server_create_socket(void);
 void		 server_loop(void);
 int		 server_should_shutdown(void);
@@ -112,6 +110,7 @@ server_start(int lockfd, char *lockfile)
 	/* The first client is special and gets a socketpair; create it. */
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pair) != 0)
 		fatal("socketpair failed");
+	log_debug("starting server");
 
 	switch (fork()) {
 	case -1:
@@ -146,7 +145,6 @@ server_start(int lockfd, char *lockfile)
 	RB_INIT(&sessions);
 	RB_INIT(&dead_sessions);
 	TAILQ_INIT(&session_groups);
-	ARRAY_INIT(&global_buffers);
 	mode_key_init_trees();
 	key_bindings_init();
 	utf8_build();
@@ -212,12 +210,11 @@ server_loop(void)
 		server_window_loop();
 		server_client_loop();
 
-		key_bindings_clean();
 		server_clean_dead();
 	}
 }
 
-/* Check if the server should be shutting down (no more clients or sessions). */
+/* Check if the server should exit (no more clients or sessions). */
 int
 server_should_shutdown(void)
 {

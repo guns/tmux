@@ -58,28 +58,22 @@ cmd_save_buffer_exec(struct cmd *self, struct cmd_q *cmdq)
 	struct client		*c = cmdq->client;
 	struct session          *s;
 	struct paste_buffer	*pb;
-	const char		*path;
-	char			*cause, *start, *end, *msg;
+	const char		*path, *bufname;
+	char			*start, *end, *msg;
 	size_t			 size, used, msglen;
-	int			 cwd, fd, buffer;
+	int			 cwd, fd;
 	FILE			*f;
 
 	if (!args_has(args, 'b')) {
-		if ((pb = paste_get_top(&global_buffers)) == NULL) {
+		if ((pb = paste_get_top()) == NULL) {
 			cmdq_error(cmdq, "no buffers");
 			return (CMD_RETURN_ERROR);
 		}
 	} else {
-		buffer = args_strtonum(args, 'b', 0, INT_MAX, &cause);
-		if (cause != NULL) {
-			cmdq_error(cmdq, "buffer %s", cause);
-			free(cause);
-			return (CMD_RETURN_ERROR);
-		}
-
-		pb = paste_get_index(&global_buffers, buffer);
+		bufname = args_get(args, 'b');
+		pb = paste_get_name(bufname);
 		if (pb == NULL) {
-			cmdq_error(cmdq, "no buffer %d", buffer);
+			cmdq_error(cmdq, "no buffer %s", bufname);
 			return (CMD_RETURN_ERROR);
 		}
 	}
@@ -111,7 +105,7 @@ cmd_save_buffer_exec(struct cmd *self, struct cmd_q *cmdq)
 		if (fd != -1)
 			f = fdopen(fd, "ab");
 	} else {
-		fd = openat(cwd, path, O_CREAT|O_RDWR, 0600);
+		fd = openat(cwd, path, O_CREAT|O_RDWR|O_TRUNC, 0600);
 		if (fd != -1)
 			f = fdopen(fd, "wb");
 	}
@@ -141,7 +135,6 @@ do_print:
 		return (CMD_RETURN_ERROR);
 	}
 	msg = NULL;
-	msglen = 0;
 
 	used = 0;
 	while (used != pb->size) {

@@ -84,7 +84,8 @@ cmd_find_window_match_flags(struct args *args)
 
 void
 cmd_find_window_match(struct cmd_find_window_data_list *find_list,
-    int match_flags, struct winlink *wl, const char *str, const char *searchstr)
+    int match_flags, struct winlink *wl, const char *str,
+    const char *searchstr)
 {
 	struct cmd_find_window_data	 find_data;
 	struct window_pane		*wp;
@@ -199,6 +200,8 @@ cmd_find_window_exec(struct cmd *self, struct cmd_q *cmdq)
 	window_choose_ready(wl->window->active, 0, cmd_find_window_callback);
 
 out:
+	for (i = 0; i < ARRAY_LENGTH(&find_list); i++)
+		free(ARRAY_ITEM(&find_list, i).list_ctx);
 	ARRAY_FREE(&find_list);
 	return (CMD_RETURN_NORMAL);
 }

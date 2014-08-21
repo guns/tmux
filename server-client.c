@@ -113,21 +113,22 @@ server_client_create(int fd)
 
 /* Open client terminal if needed. */
 int
-server_client_open(struct client *c, struct session *s, char **cause)
+server_client_open(struct client *c, char **cause)
 {
-	struct options	*oo = s != NULL ? &s->options : &global_s_options;
-	char		*overrides;
-
 	if (c->flags & CLIENT_CONTROL)
 		return (0);
+
+	if (strcmp(c->ttyname, "/dev/tty") == 0) {
+		*cause = xstrdup("can't use /dev/tty");
+		return (-1);
+	}
 
 	if (!(c->flags & CLIENT_TERMINAL)) {
 		*cause = xstrdup("not a terminal");
 		return (-1);
 	}
 
-	overrides = options_get_string(oo, "terminal-overrides");
-	if (tty_open(&c->tty, overrides, cause) != 0)
+	if (tty_open(&c->tty, cause) != 0)
 		return (-1);
 
 	return (0);
@@ -222,7 +223,7 @@ server_client_callback(int fd, short events, void *data)
 		return;
 
 	if (fd == c->ibuf.fd) {
-		if (events & EV_WRITE && msgbuf_write(&c->ibuf.w) < 0 &&
+		if (events & EV_WRITE && msgbuf_write(&c->ibuf.w) <= 0 &&
 		    errno != EAGAIN)
 			goto client_lost;
 
@@ -655,7 +656,7 @@ server_client_reset_state(struct client *c)
 	 */
 	mode = s->mode;
 	if ((c->tty.mouse.flags & MOUSE_RESIZE_PANE) &&
-	    !(mode & (MODE_MOUSE_BUTTON|MODE_MOUSE_ANY)))
+	    !(mode & MODE_MOUSE_BUTTON))
 		mode |= MODE_MOUSE_BUTTON;
 
 	/*
@@ -882,6 +883,9 @@ server_client_msg_dispatch(struct client *c)
 			if (!(c->flags & CLIENT_SUSPENDED))
 				break;
 			c->flags &= ~CLIENT_SUSPENDED;
+
+			if (c->tty.fd == -1) /* exited in the meantime */
+				break;
 
 			if (gettimeofday(&c->activity_time, NULL) != 0)
 				fatal("gettimeofday");

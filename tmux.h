@@ -82,7 +82,7 @@ extern char   **environ;
 
 /* Default template for choose-buffer. */
 #define CHOOSE_BUFFER_TEMPLATE					\
-	"#{line}: #{buffer_size} bytes: \"#{buffer_sample}\""
+	"#{buffer_name}: #{buffer_size} bytes: #{buffer_sample}"
 
 /* Default template for choose-client. */
 #define CHOOSE_CLIENT_TEMPLATE					\
@@ -115,7 +115,8 @@ extern char   **environ;
 
 /* Default template for list-buffers. */
 #define LIST_BUFFERS_TEMPLATE					\
-	"#{line}: #{buffer_size} bytes: \"#{buffer_sample}\""
+	"#{buffer_name}: #{buffer_size} bytes: "		\
+	"\"#{buffer_sample}\""
 
 /* Default template for list-clients. */
 #define LIST_CLIENTS_TEMPLATE					\
@@ -191,14 +192,6 @@ enum key_code {
 	KEYC_F10,
 	KEYC_F11,
 	KEYC_F12,
-	KEYC_F13,
-	KEYC_F14,
-	KEYC_F15,
-	KEYC_F16,
-	KEYC_F17,
-	KEYC_F18,
-	KEYC_F19,
-	KEYC_F20,
 	KEYC_IC,
 	KEYC_DC,
 	KEYC_HOME,
@@ -304,26 +297,69 @@ enum tty_code_code {
 	TTYC_KEND5,
 	TTYC_KEND6,
 	TTYC_KEND7,
-	TTYC_KF1,	/* key_f1, k1 */
-	TTYC_KF10,	/* key_f10, k; */
-	TTYC_KF11,	/* key_f11, F1 */
-	TTYC_KF12,	/* key_f12, F2 */
-	TTYC_KF13,	/* key_f13, F3 */
-	TTYC_KF14,	/* key_f14, F4 */
-	TTYC_KF15,	/* key_f15, F5 */
-	TTYC_KF16,	/* key_f16, F6 */
-	TTYC_KF17,	/* key_f17, F7 */
-	TTYC_KF18,	/* key_f18, F8 */
-	TTYC_KF19,	/* key_f19, F9 */
-	TTYC_KF2,	/* key_f2, k2 */
-	TTYC_KF20,	/* key_f20, F10 */
-	TTYC_KF3,	/* key_f3, k3 */
-	TTYC_KF4,	/* key_f4, k4 */
-	TTYC_KF5,	/* key_f5, k5 */
-	TTYC_KF6,	/* key_f6, k6 */
-	TTYC_KF7,	/* key_f7, k7 */
-	TTYC_KF8,	/* key_f8, k8 */
-	TTYC_KF9,	/* key_f9, k9 */
+	TTYC_KF1,
+	TTYC_KF10,
+	TTYC_KF11,
+	TTYC_KF12,
+	TTYC_KF13,
+	TTYC_KF14,
+	TTYC_KF15,
+	TTYC_KF16,
+	TTYC_KF17,
+	TTYC_KF18,
+	TTYC_KF19,
+	TTYC_KF2,
+	TTYC_KF20,
+	TTYC_KF21,
+	TTYC_KF22,
+	TTYC_KF23,
+	TTYC_KF24,
+	TTYC_KF25,
+	TTYC_KF26,
+	TTYC_KF27,
+	TTYC_KF28,
+	TTYC_KF29,
+	TTYC_KF3,
+	TTYC_KF30,
+	TTYC_KF31,
+	TTYC_KF32,
+	TTYC_KF33,
+	TTYC_KF34,
+	TTYC_KF35,
+	TTYC_KF36,
+	TTYC_KF37,
+	TTYC_KF38,
+	TTYC_KF39,
+	TTYC_KF4,
+	TTYC_KF40,
+	TTYC_KF41,
+	TTYC_KF42,
+	TTYC_KF43,
+	TTYC_KF44,
+	TTYC_KF45,
+	TTYC_KF46,
+	TTYC_KF47,
+	TTYC_KF48,
+	TTYC_KF49,
+	TTYC_KF5,
+	TTYC_KF50,
+	TTYC_KF51,
+	TTYC_KF52,
+	TTYC_KF53,
+	TTYC_KF54,
+	TTYC_KF55,
+	TTYC_KF56,
+	TTYC_KF57,
+	TTYC_KF58,
+	TTYC_KF59,
+	TTYC_KF6,
+	TTYC_KF60,
+	TTYC_KF61,
+	TTYC_KF62,
+	TTYC_KF63,
+	TTYC_KF7,
+	TTYC_KF8,
+	TTYC_KF9,
 	TTYC_KHOM2,
 	TTYC_KHOM3,
 	TTYC_KHOM4,
@@ -579,6 +615,7 @@ enum mode_key_cmd {
 	MODEKEYCOPY_SEARCHREVERSE,
 	MODEKEYCOPY_SEARCHUP,
 	MODEKEYCOPY_SELECTLINE,
+	MODEKEYCOPY_STARTNAMEDBUFFER,
 	MODEKEYCOPY_STARTNUMBERPREFIX,
 	MODEKEYCOPY_STARTOFLINE,
 	MODEKEYCOPY_STARTSELECTION,
@@ -642,13 +679,13 @@ struct mode_key_table {
 #define MODE_WRAP 0x10		/* whether lines wrap */
 #define MODE_MOUSE_STANDARD 0x20
 #define MODE_MOUSE_BUTTON 0x40
-#define MODE_MOUSE_ANY 0x80
+/* 0x80 unused */
 #define MODE_MOUSE_UTF8 0x100
 #define MODE_MOUSE_SGR 0x200
 #define MODE_BRACKETPASTE 0x400
 #define MODE_FOCUSON 0x800
 
-#define ALL_MOUSE_MODES (MODE_MOUSE_STANDARD|MODE_MOUSE_BUTTON|MODE_MOUSE_ANY)
+#define ALL_MOUSE_MODES (MODE_MOUSE_STANDARD|MODE_MOUSE_BUTTON)
 
 /* A single UTF-8 character. */
 struct utf8_data {
@@ -659,16 +696,6 @@ struct utf8_data {
 
 	u_int	width;
 };
-
-/* Grid output. */
-#if defined(DEBUG) && \
-    ((defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || \
-     (defined(__GNUC__) && __GNUC__ >= 3))
-#define GRID_DEBUG(gd, fmt, ...) log_debug2("%s: (sx=%u, sy=%u, hsize=%u) " \
-    fmt, __func__, (gd)->sx, (gd)->sy, (gd)->hsize, ## __VA_ARGS__)
-#else
-#define GRID_DEBUG(...)
-#endif
 
 /* Grid attributes. */
 #define GRID_ATTR_BRIGHT 0x1
@@ -808,14 +835,22 @@ struct screen_write_ctx {
 #define screen_hsize(s) ((s)->grid->hsize)
 #define screen_hlimit(s) ((s)->grid->hlimit)
 
+/* Input parser cell. */
+struct input_cell {
+	struct grid_cell	cell;
+	int			set;
+	int			g0set;	/* 1 if ACS */
+	int			g1set;	/* 1 if ACS */
+};
+
 /* Input parser context. */
 struct input_ctx {
 	struct window_pane     *wp;
 	struct screen_write_ctx ctx;
 
-	struct grid_cell	cell;
+	struct input_cell	cell;
 
-	struct grid_cell	old_cell;
+	struct input_cell	old_cell;
 	u_int 			old_cx;
 	u_int			old_cy;
 
@@ -825,8 +860,11 @@ struct input_ctx {
 	u_char			param_buf[64];
 	size_t			param_len;
 
-	u_char			input_buf[256];
+#define INPUT_BUF_START 32
+#define INPUT_BUF_LIMIT 1048576
+	u_char		       *input_buf;
 	size_t			input_len;
+	size_t			input_space;
 
 	int			param_list[24];	/* -1 not present */
 	u_int			param_list_len;
@@ -896,6 +934,7 @@ struct window_choose_mode_item {
 /* Child window structure. */
 struct window_pane {
 	u_int		 id;
+	u_int		 active_point;
 
 	struct window	*window;
 
@@ -915,7 +954,8 @@ struct window_pane {
 #define PANE_RESIZE 0x8
 #define PANE_FOCUSPUSH 0x10
 
-	char		*cmd;
+	int		 argc;
+	char	       **argv;
 	char		*shell;
 	int		 cwd;
 
@@ -952,6 +992,7 @@ struct window_pane {
 };
 TAILQ_HEAD(window_panes, window_pane);
 RB_HEAD(window_pane_tree, window_pane);
+ARRAY_DECL(window_pane_list, struct window_pane *);
 
 /* Window structure. */
 struct window {
@@ -997,10 +1038,8 @@ struct winlink {
 	int              flags;
 #define WINLINK_BELL 0x1
 #define WINLINK_ACTIVITY 0x2
-#define WINLINK_CONTENT 0x4
-#define WINLINK_SILENCE 0x8
-#define WINLINK_ALERTFLAGS \
-    (WINLINK_BELL|WINLINK_ACTIVITY|WINLINK_CONTENT|WINLINK_SILENCE)
+#define WINLINK_SILENCE 0x4
+#define WINLINK_ALERTFLAGS (WINLINK_BELL|WINLINK_ACTIVITY|WINLINK_SILENCE)
 
 	RB_ENTRY(winlink) entry;
 	TAILQ_ENTRY(winlink) sentry;
@@ -1031,8 +1070,6 @@ struct layout_cell {
 	u_int		 yoff;
 
 	struct window_pane *wp;
-	struct window_pane *lastwp;
-
 	struct layout_cells cells;
 
 	TAILQ_ENTRY(layout_cell) entry;
@@ -1042,8 +1079,14 @@ struct layout_cell {
 struct paste_buffer {
 	char		*data;
 	size_t		 size;
+
+	char		*name;
+	int		 automatic;
+	u_int		 order;
+
+	RB_ENTRY(paste_buffer) name_entry;
+	RB_ENTRY(paste_buffer) time_entry;
 };
-ARRAY_DECL(paste_stack, struct paste_buffer *);
 
 /* Environment variable. */
 struct environ_entry {
@@ -1137,6 +1180,9 @@ LIST_HEAD(tty_terms, tty_term);
 #define MOUSE_WHEEL_UP 0
 #define MOUSE_WHEEL_DOWN 1
 
+/* Mouse wheel multipler. */
+#define MOUSE_WHEEL_SCALE 3
+
 /* Mouse event bits. */
 #define MOUSE_EVENT_DOWN 0x1
 #define MOUSE_EVENT_DRAG 0x2
@@ -1175,6 +1221,7 @@ struct mouse_event {
 
 	u_int	button;
 	u_int	clicks;
+	u_int	scroll;
 
 	int	wheel;
 	int     event;
@@ -1502,7 +1549,7 @@ RB_HEAD(format_tree, format_entry);
 #define CMD_SRCDST_WINDOW_USAGE "[-s src-window] [-t dst-window]"
 #define CMD_SRCDST_SESSION_USAGE "[-s src-session] [-t dst-session]"
 #define CMD_SRCDST_CLIENT_USAGE "[-s src-client] [-t dst-client]"
-#define CMD_BUFFER_USAGE "[-b buffer-index]"
+#define CMD_BUFFER_USAGE "[-b buffer-name]"
 
 /* tmux.c */
 extern struct options global_options;
@@ -1551,7 +1598,7 @@ void		 format_winlink(struct format_tree *, struct session *,
 void		 format_window_pane(struct format_tree *,
 		     struct window_pane *);
 void		 format_paste_buffer(struct format_tree *,
-		     struct paste_buffer *);
+		     struct paste_buffer *, int);
 
 /* mode-key.c */
 extern const struct mode_key_table mode_key_tables[];
@@ -1662,7 +1709,7 @@ void	tty_set_title(struct tty *, const char *);
 void	tty_update_mode(struct tty *, int, struct screen *);
 void	tty_force_cursor_colour(struct tty *, const char *);
 void	tty_draw_line(struct tty *, struct screen *, u_int, u_int, u_int);
-int	tty_open(struct tty *, const char *, char **);
+int	tty_open(struct tty *, char **);
 void	tty_close(struct tty *);
 void	tty_free(struct tty *);
 void	tty_write(
@@ -1691,7 +1738,7 @@ void	tty_bell(struct tty *);
 /* tty-term.c */
 extern struct tty_terms tty_terms;
 extern const struct tty_term_code_entry tty_term_codes[NTTYCODE];
-struct tty_term *tty_term_find(char *, int, const char *, char **);
+struct tty_term *tty_term_find(char *, int, char **);
 void		 tty_term_free(struct tty_term *);
 int		 tty_term_has(struct tty_term *, enum tty_code_code);
 const char	*tty_term_string(struct tty_term *, enum tty_code_code);
@@ -1714,14 +1761,15 @@ void	tty_keys_free(struct tty *);
 int	tty_keys_next(struct tty *);
 
 /* paste.c */
-struct paste_buffer *paste_walk_stack(struct paste_stack *, u_int *);
-struct paste_buffer *paste_get_top(struct paste_stack *);
-struct paste_buffer *paste_get_index(struct paste_stack *, u_int);
-int		 paste_free_top(struct paste_stack *);
-int		 paste_free_index(struct paste_stack *, u_int);
-void		 paste_add(struct paste_stack *, char *, size_t, u_int);
-int		 paste_replace(struct paste_stack *, u_int, char *, size_t);
-char		*paste_print(struct paste_buffer *, size_t);
+struct paste_buffer *paste_walk(struct paste_buffer *);
+struct paste_buffer *paste_get_top(void);
+struct paste_buffer *paste_get_name(const char *);
+int		 paste_free_top(void);
+int		 paste_free_name(const char *);
+void		 paste_add(char *, size_t);
+int		 paste_rename(const char *, const char *, char **);
+int		 paste_set(char *, size_t, const char *, char **);
+char		*paste_make_sample(struct paste_buffer *, int);
 void		 paste_send_pane(struct paste_buffer *, struct window_pane *,
 		     const char *, int);
 
@@ -1741,8 +1789,9 @@ long long	 args_strtonum(
 /* cmd.c */
 int		 cmd_pack_argv(int, char **, char *, size_t);
 int		 cmd_unpack_argv(char *, size_t, int, char ***);
-char	       **cmd_copy_argv(int, char *const *);
+char	       **cmd_copy_argv(int, char **);
 void		 cmd_free_argv(int, char **);
+char		*cmd_stringify_argv(int, char **);
 struct cmd	*cmd_parse(int, char **, const char *, u_int, char **);
 size_t		 cmd_print(struct cmd *, char *, size_t);
 struct session	*cmd_current_session(struct cmd_q *, int);
@@ -1765,7 +1814,6 @@ extern const struct cmd_entry cmd_break_pane_entry;
 extern const struct cmd_entry cmd_capture_pane_entry;
 extern const struct cmd_entry cmd_choose_buffer_entry;
 extern const struct cmd_entry cmd_choose_client_entry;
-extern const struct cmd_entry cmd_choose_list_entry;
 extern const struct cmd_entry cmd_choose_session_entry;
 extern const struct cmd_entry cmd_choose_tree_entry;
 extern const struct cmd_entry cmd_choose_window_entry;
@@ -1860,7 +1908,6 @@ size_t		 cmd_list_print(struct cmd_list *, char *, size_t);
 struct cmd_q	*cmdq_new(struct client *);
 int		 cmdq_free(struct cmd_q *);
 void printflike2 cmdq_print(struct cmd_q *, const char *, ...);
-void printflike2 cmdq_info(struct cmd_q *, const char *, ...);
 void printflike2 cmdq_error(struct cmd_q *, const char *, ...);
 int		 cmdq_guard(struct cmd_q *, const char *, int);
 void		 cmdq_run(struct cmd_q *, struct cmd_list *);
@@ -1882,7 +1929,6 @@ RB_PROTOTYPE(key_bindings, key_binding, entry, key_bindings_cmp);
 struct key_binding *key_bindings_lookup(int);
 void	 key_bindings_add(int, int, struct cmd_list *);
 void	 key_bindings_remove(int);
-void	 key_bindings_clean(void);
 void	 key_bindings_init(void);
 void	 key_bindings_dispatch(struct key_binding *, struct client *);
 
@@ -1893,7 +1939,6 @@ const char *key_string_lookup_key(int);
 /* server.c */
 extern struct clients clients;
 extern struct clients dead_clients;
-extern struct paste_stack global_buffers;
 int	 server_start(int, char *);
 void	 server_update_socket(void);
 void	 server_add_accept(int);
@@ -1901,7 +1946,7 @@ void	 server_add_accept(int);
 /* server-client.c */
 void	 server_client_handle_key(struct client *, int);
 void	 server_client_create(int);
-int      server_client_open(struct client *, struct session *, char **);
+int      server_client_open(struct client *, char **);
 void	 server_client_lost(struct client *);
 void	 server_client_callback(int, short, void *);
 void	 server_client_status_timer(void);
@@ -2136,9 +2181,9 @@ void		 winlink_stack_remove(struct winlink_stack *, struct winlink *);
 int		 window_index(struct window *, u_int *);
 struct window	*window_find_by_id(u_int);
 struct window	*window_create1(u_int, u_int);
-struct window	*window_create(const char *, const char *, const char *, int,
-		     struct environ *, struct termios *, u_int, u_int, u_int,
-		     char **);
+struct window	*window_create(const char *, int, char **, const char *,
+		     const char *, int, struct environ *, struct termios *,
+		     u_int, u_int, u_int, char **);
 void		 window_destroy(struct window *);
 struct window_pane *window_get_active_at(struct window *, u_int, u_int);
 void		 window_set_active_at(struct window *, u_int, u_int);
@@ -2148,6 +2193,7 @@ struct window_pane *window_add_pane(struct window *, u_int);
 void		 window_resize(struct window *, u_int, u_int);
 int		 window_zoom(struct window_pane *);
 int		 window_unzoom(struct window *);
+void		 window_lost_pane(struct window *, struct window_pane *);
 void		 window_remove_pane(struct window *, struct window_pane *);
 struct window_pane *window_pane_at_index(struct window *, u_int);
 struct window_pane *window_pane_next_by_number(struct window *,
@@ -2161,9 +2207,9 @@ struct window_pane *window_pane_find_by_id(u_int);
 struct window_pane *window_pane_create(struct window *, u_int, u_int, u_int);
 void		 window_pane_destroy(struct window_pane *);
 void		 window_pane_timer_start(struct window_pane *);
-int		 window_pane_spawn(struct window_pane *, const char *,
-		     const char *, int, struct environ *, struct termios *,
-		     char **);
+int		 window_pane_spawn(struct window_pane *, int, char **,
+		     const char *, const char *, int, struct environ *,
+		     struct termios *, char **);
 void		 window_pane_resize(struct window_pane *, u_int, u_int);
 void		 window_pane_alternate_on(struct window_pane *,
 		     struct grid_cell *, int);
@@ -2299,20 +2345,20 @@ RB_PROTOTYPE(sessions, session, entry, session_cmp);
 int		 session_alive(struct session *);
 struct session	*session_find(const char *);
 struct session	*session_find_by_id(u_int);
-struct session	*session_create(const char *, const char *, int,
-		     struct environ *, struct termios *, int, u_int, u_int,
-		     char **);
+struct session	*session_create(const char *, int, char **, const char *,
+		     int, struct environ *, struct termios *, int, u_int,
+		     u_int, char **);
 void		 session_destroy(struct session *);
 int		 session_check_name(const char *);
 void		 session_update_activity(struct session *);
 struct session	*session_next_session(struct session *);
 struct session	*session_previous_session(struct session *);
-struct winlink	*session_new(struct session *, const char *, const char *, int,
-		     int, char **);
-struct winlink	*session_attach(
-		     struct session *, struct window *, int, char **);
+struct winlink	*session_new(struct session *, const char *, int, char **,
+		     const char *, int, int, char **);
+struct winlink	*session_attach(struct session *, struct window *, int,
+		     char **);
 int		 session_detach(struct session *, struct winlink *);
-struct winlink*	 session_has(struct session *, struct window *);
+struct winlink	*session_has(struct session *, struct window *);
 int		 session_next(struct session *, int);
 int		 session_previous(struct session *, int);
 int		 session_select(struct session *, int);
@@ -2328,11 +2374,17 @@ void		 session_group_synchronize1(struct session *, struct session *);
 void		 session_renumber_windows(struct session *);
 
 /* utf8.c */
-void	utf8_build(void);
-int	utf8_open(struct utf8_data *, u_char);
-int	utf8_append(struct utf8_data *, u_char);
-u_int	utf8_combine(const struct utf8_data *);
-u_int	utf8_split2(u_int, u_char *);
+void		 utf8_build(void);
+void		 utf8_set(struct utf8_data *, u_char);
+int		 utf8_open(struct utf8_data *, u_char);
+int		 utf8_append(struct utf8_data *, u_char);
+u_int		 utf8_combine(const struct utf8_data *);
+u_int		 utf8_split2(u_int, u_char *);
+int		 utf8_strvis(char *, const char *, size_t, int);
+struct utf8_data *utf8_fromcstr(const char *);
+char		*utf8_tocstr(struct utf8_data *);
+u_int		 utf8_cstrwidth(const char *);
+char		*utf8_trimcstr(const char *, u_int);
 
 /* osdep-*.c */
 char		*osdep_get_name(int, char *);
@@ -2340,13 +2392,9 @@ char		*osdep_get_cwd(int);
 struct event_base *osdep_event_init(void);
 
 /* log.c */
-void		 log_open(int, const char *);
+void		 log_open(const char *);
 void		 log_close(void);
-void printflike1 log_warn(const char *, ...);
-void printflike1 log_warnx(const char *, ...);
-void printflike1 log_info(const char *, ...);
 void printflike1 log_debug(const char *, ...);
-void printflike1 log_debug2(const char *, ...);
 __dead void printflike1 log_fatal(const char *, ...);
 __dead void printflike1 log_fatalx(const char *, ...);
 
@@ -2367,7 +2415,9 @@ const char	*style_tostring(struct grid_cell *);
 void		 style_update_new(struct options *, const char *, const char *);
 void		 style_update_old(struct options *, const char *,
 		     struct grid_cell *);
-void	style_apply(struct grid_cell *, struct options *, const char *);
-void	style_apply_update(struct grid_cell *, struct options *, const char *);
+void		 style_apply(struct grid_cell *, struct options *,
+		     const char *);
+void		 style_apply_update(struct grid_cell *, struct options *,
+		     const char *);
 
 #endif /* TMUX_H */

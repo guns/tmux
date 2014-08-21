@@ -25,17 +25,15 @@ endif
 # Set flags for gcc. gcc4 whines abouts silly stuff so it needs slightly
 # different flags.
 if IS_GCC
-CFLAGS += -std=gnu99
+CFLAGS += -std=gnu99 -O2
 if IS_DEBUG
-CFLAGS += -O0 -g
+CFLAGS += -g
 CFLAGS += -Wno-long-long -Wall -W -Wnested-externs -Wformat=2
 CFLAGS += -Wmissing-prototypes -Wstrict-prototypes -Wmissing-declarations
 CFLAGS += -Wwrite-strings -Wshadow -Wpointer-arith -Wsign-compare
 CFLAGS += -Wundef -Wbad-function-cast -Winline -Wcast-align
 CFLAGS += -Wdeclaration-after-statement
 CPPFLAGS += -DDEBUG
-else
-CFLAGS += -O2
 endif
 if IS_GCC4
 CPPFLAGS += -iquote. -I/usr/local/include
@@ -73,7 +71,6 @@ dist_tmux_SOURCES = \
 	cmd-capture-pane.c \
 	cmd-choose-buffer.c \
 	cmd-choose-client.c \
-	cmd-choose-list.c \
 	cmd-choose-tree.c \
 	cmd-clear-history.c \
 	cmd-clock-mode.c \
@@ -216,6 +213,9 @@ endif
 if NO_FGETLN
 nodist_tmux_SOURCES += compat/fgetln.c
 endif
+if NO_FPARSELN
+nodist_tmux_SOURCES += compat/fparseln.c
+endif
 if NO_GETOPT
 nodist_tmux_SOURCES += compat/getopt.c
 endif
@@ -248,9 +248,9 @@ install-exec-hook:
 			>$(srcdir)/tmux.1.mdoc; \
 	else \
 		sed -e "s|@SYSCONFDIR@|$(sysconfdir)|g" $(srcdir)/tmux.1| \
-			$(AWK) -fmdoc2man.awk >$(srcdir)/tmux.1.man; \
+			$(AWK) -f$(srcdir)/mdoc2man.awk >$(srcdir)/tmux.1.man; \
 	fi
-	$(MKDIR_P) $(DESTDIR)$(mandir)/man1
+	$(mkdir_p) $(DESTDIR)$(mandir)/man1
 	$(INSTALL_DATA) $(srcdir)/tmux.1.@MANFORMAT@ \
 		$(DESTDIR)$(mandir)/man1/tmux.1
 	rake terminfo

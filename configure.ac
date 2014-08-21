@@ -1,7 +1,7 @@
 # $Id$
 
 # Miscellaneous autofoo bullshit.
-AC_INIT(tmux, 1.10)
+AC_INIT(tmux, 2.0)
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([foreign subdir-objects])
@@ -16,7 +16,6 @@ AC_CANONICAL_HOST
 # Set up the compiler in two different ways and say yes we may want to install.
 AC_PROG_CC
 AM_PROG_CC_C_O
-AC_PROG_MKDIR_P
 AC_PROG_INSTALL
 
 # Default tmux.conf goes in /etc not ${prefix}/etc.
@@ -296,6 +295,13 @@ if test "x$found_fgetln" = xyes; then
 fi
 AM_CONDITIONAL(NO_FGETLN, [test "x$found_fgetln" = xno])
 
+# Look for fparseln, compat/fparseln.c used if missing.
+AC_CHECK_FUNC(fparseln, found_fparseln=yes, found_fparseln=no)
+if test "x$found_fparseln" = xyes; then
+	AC_DEFINE(HAVE_FPARSELN)
+fi
+AM_CONDITIONAL(NO_FPARSELN, [test "x$found_fparseln" = xno])
+
 # Look for strcasestr, compat/strcasestr.c used if missing.
 AC_CHECK_FUNC(strcasestr, found_strcasestr=yes, found_strcasestr=no)
 if test "x$found_strcasestr" = xyes; then
@@ -500,6 +506,10 @@ case "$host_os" in
 	*hpux*)
 		AC_MSG_RESULT(hpux)
 		PLATFORM=hpux
+		;;
+	*cygwin*)
+		AC_MSG_RESULT(cygwin)
+		PLATFORM=cygwin
 		;;
 	*)
 		AC_MSG_RESULT(unknown)

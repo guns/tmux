@@ -65,7 +65,7 @@ osdep_get_cwd(int fd)
 {
 	static char	 target[MAXPATHLEN + 1];
 	char		*path;
-	pid_t		 pgrp, sid;
+	pid_t		 pgrp;
 	ssize_t		 n;
 
 	if ((pgrp = tcgetpgrp(fd)) == -1)
@@ -74,13 +74,6 @@ osdep_get_cwd(int fd)
 	xasprintf(&path, "/proc/%lld/cwd", (long long) pgrp);
 	n = readlink(path, target, MAXPATHLEN);
 	free(path);
-
-	if (n == -1 && ioctl(fd, TIOCGSID, &sid) != -1) {
-		xasprintf(&path, "/proc/%lld/cwd", (long long) sid);
-		n = readlink(path, target, MAXPATHLEN);
-		free(path);
-	}
-
 	if (n > 0) {
 		target[n] = '\0';
 		return (target);
@@ -91,7 +84,5 @@ osdep_get_cwd(int fd)
 struct event_base *
 osdep_event_init(void)
 {
-	/* On Linux, epoll doesn't work on /dev/null (yes, really). */
-	setenv("EVENT_NOEPOLL", "1", 1);
 	return (event_init());
 }

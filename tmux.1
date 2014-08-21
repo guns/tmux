@@ -168,10 +168,6 @@ server process to recreate it.
 Behave as a login shell.
 This flag currently has no effect and is for compatibility with other shells
 when using tmux as a login shell.
-.It Fl q
-Set the
-.Ic quiet
-server option to prevent the server sending various informational messages.
 .It Fl S Ar socket-path
 Specify a full alternative path to the server socket.
 If
@@ -486,11 +482,36 @@ It may be used alone to target a pane or the window containing it.
 arguments are
 .Xr sh 1
 commands.
-These must be passed as a single item, which typically means quoting them, for
-example:
+This may be a single argument passed to the shell, for example:
 .Bd -literal -offset indent
 new-window 'vi /etc/passwd'
 .Ed
+.Pp
+Will run:
+.Bd -literal -offset indent
+/bin/sh -c 'vi /etc/passwd'
+.Ed
+.Pp
+Additionally, the
+.Ic new-window ,
+.Ic new-session ,
+.Ic split-window ,
+.Ic respawn-window
+and
+.Ic respawn-pane
+commands allow
+.Ar shell-command
+to be given as multiple arguments and executed directly (without
+.Ql sh -c ) .
+This can avoid issues with shell quoting.
+For example:
+.Bd -literal -offset indent
+$ tmux new-window vi /etc/passwd
+.Ed
+.Pp
+Will run
+.Xr vi 1
+directly without invoking the shell.
 .Pp
 .Ar command
 .Op Ar arguments
@@ -782,7 +803,7 @@ Show client messages or server information.
 Any messages displayed on the status line are saved in a per-client message
 log, up to a maximum of the limit set by the
 .Ar message-limit
-session option for the session attached to that client.
+server option.
 With
 .Fl t ,
 display the log for
@@ -857,6 +878,7 @@ The following keys are supported as appropriate for the mode:
 .It Sy "Function" Ta Sy "vi" Ta Sy "emacs"
 .It Li "Append selection" Ta "A" Ta ""
 .It Li "Back to indentation" Ta "^" Ta "M-m"
+.It Li "Copy to named buffer" Ta \&" Ta ""
 .It Li "Bottom of history" Ta "G" Ta "M-<"
 .It Li "Clear selection" Ta "Escape" Ta "C-g"
 .It Li "Copy selection" Ta "Enter" Ta "M-w"
@@ -937,9 +959,6 @@ For example, to move the cursor forward by ten words, use
 in emacs mode, and
 .Ql 10w
 in vi.
-.Pp
-When copying the selection, the repeat count indicates the buffer index to
-replace, if used.
 .Pp
 Mode key bindings are defined in a set of named tables:
 .Em vi-edit
@@ -1098,7 +1117,7 @@ but a different format may be specified with
 .Fl F .
 .It Xo Ic capture-pane
 .Op Fl aepPq
-.Op Fl b Ar buffer-index
+.Op Fl b Ar buffer-name
 .Op Fl E Ar end-line
 .Op Fl S Ar start-line
 .Op Fl t Ar target-pane
@@ -1133,6 +1152,12 @@ and
 .Fl E
 specify the starting and ending line numbers, zero is the first line of the
 visible pane and negative numbers are lines in the history.
+.Ql -
+to
+.Fl S
+is the start of the history and to
+.Fl E
+the end of the visible pane.
 The default is to capture only the visible contents of the pane.
 .It Xo
 .Ic choose-client
@@ -1155,32 +1180,6 @@ is not given, "detach-client -t '%%'" is used.
 For the meaning of the
 .Fl F
 flag, see the
-.Sx FORMATS
-section.
-This command works only if at least one client is attached.
-.It Xo
-.Ic choose-list
-.Op Fl l Ar items
-.Op Fl t Ar target-window
-.Op Ar template
-.Xc
-Put a window into list choice mode, allowing
-.Ar items
-to be selected.
-.Ar items
-can be a comma-separated list to display more than one item.
-If an item has spaces, that entry must be quoted.
-After an item is chosen,
-.Ql %%
-is replaced by the chosen item in the
-.Ar template
-and the result is executed as a command.
-If
-.Ar template
-is not given, "run-shell '%%'" is used.
-.Ar items
-also accepts format specifiers.
-For the meaning of this see the
 .Sx FORMATS
 section.
 This command works only if at least one client is attached.
@@ -1872,7 +1871,7 @@ Commands related to key bindings are as follows:
 .Bl -tag -width Ds
 .It Xo Ic bind-key
 .Op Fl cnr
-.Op Fl t Ar key-table
+.Op Fl t Ar mode-table
 .Ar key Ar command Op Ar arguments
 .Xc
 .D1 (alias: Ic bind )
@@ -1901,7 +1900,7 @@ If
 is present,
 .Ar key
 is bound in
-.Ar key-table :
+.Ar mode-table :
 the binding for command mode with
 .Fl c
 or for normal mode without.
@@ -1959,7 +1958,7 @@ Send the prefix key, or with
 the secondary prefix key, to a window as if it was pressed.
 .It Xo Ic unbind-key
 .Op Fl acn
-.Op Fl t Ar key-table
+.Op Fl t Ar mode-table
 .Ar key
 .Xc
 .D1 (alias: Ic unbind )
@@ -1981,7 +1980,7 @@ If
 is present,
 .Ar key
 in
-.Ar key-table
+.Ar mode-table
 is unbound: the binding for command mode with
 .Fl c
 or for normal mode without.
@@ -2077,9 +2076,7 @@ flag prevents setting an option that is already set.
 .Pp
 The
 .Fl q
-flag suppresses the informational message (as if the
-.Ic quiet
-server option was set).
+flag suppresses errors about unknown options.
 .Pp
 With
 .Fl a ,
@@ -2138,12 +2135,10 @@ passed through to applications running in
 .Nm .
 Attached clients should be detached and attached again after changing this
 option.
-.It Xo Ic quiet
-.Op Ic on | off
-.Xc
-Enable or disable the display of various informational messages (see also the
-.Fl q
-command line flag).
+.It Ic message-limit Ar number
+Set the number of error or information messages to save in the message log for
+each client.
+The default is 100.
 .It Xo Ic set-clipboard
 .Op Ic on | off
 .Xc
@@ -2166,6 +2161,42 @@ disallowedWindowOps: 20,21,SetXprop
 Or changing this property from the
 .Xr xterm 1
 interactive menu when required.
+.It Ic terminal-overrides Ar string
+Contains a list of entries which override terminal descriptions read using
+.Xr terminfo 5 .
+.Ar string
+is a comma-separated list of items each a colon-separated string made up of a
+terminal type pattern (matched using
+.Xr fnmatch 3 )
+and a set of
+.Em name=value
+entries.
+.Pp
+For example, to set the
+.Ql clear
+.Xr terminfo 5
+entry to
+.Ql \ee[H\ee[2J
+for all terminal types and the
+.Ql dch1
+entry to
+.Ql \ee[P
+for the
+.Ql rxvt
+terminal type, the option could be set to the string:
+.Bd -literal -offset indent
+"*:clear=\ee[H\ee[2J,rxvt:dch1=\ee[P"
+.Ed
+.Pp
+The terminal entry value is passed through
+.Xr strunvis 3
+before interpretation.
+The default value forcibly corrects the
+.Ql colors
+entry for terminals which support 256 colours:
+.Bd -literal -offset indent
+"*256col*:colors=256,xterm*:XT"
+.Ed
 .El
 .Pp
 Available session options are:
@@ -2359,10 +2390,6 @@ With the
 flag to the
 .Ic set-option
 command the new style is added otherwise the existing style is replaced.
-.It Ic message-limit Ar number
-Set the number of error or information messages to save in the message log for
-each client.
-The default is 20.
 .It Ic message-style Ar style
 Set status line message style.
 For how to specify
@@ -2541,10 +2568,6 @@ Examples are:
 #[fg=yellow,bold]#(apm -l)%%#[default] [#S]
 .Ed
 .Pp
-Where appropriate, special character sequences may be prefixed with a number to
-specify the maximum length, for example
-.Ql #24T .
-.Pp
 By default, UTF-8 in
 .Ar string
 is not interpreted, to enable UTF-8, use the
@@ -2610,42 +2633,6 @@ and
 .Ic status-right
 strings as UTF-8; notably, this is important for wide characters.
 This option defaults to off.
-.It Ic terminal-overrides Ar string
-Contains a list of entries which override terminal descriptions read using
-.Xr terminfo 5 .
-.Ar string
-is a comma-separated list of items each a colon-separated string made up of a
-terminal type pattern (matched using
-.Xr fnmatch 3 )
-and a set of
-.Em name=value
-entries.
-.Pp
-For example, to set the
-.Ql clear
-.Xr terminfo 5
-entry to
-.Ql \ee[H\ee[2J
-for all terminal types and the
-.Ql dch1
-entry to
-.Ql \ee[P
-for the
-.Ql rxvt
-terminal type, the option could be set to the string:
-.Bd -literal -offset indent
-"*:clear=\ee[H\ee[2J,rxvt:dch1=\ee[P"
-.Ed
-.Pp
-The terminal entry value is passed through
-.Xr strunvis 3
-before interpretation.
-The default value forcibly corrects the
-.Ql colors
-entry for terminals which support 256 colours:
-.Bd -literal -offset indent
-"*256col*:colors=256,xterm*:XT"
-.Ed
 .It Ic update-environment Ar variables
 Set a space-separated string containing a list of environment variables to be
 copied into the session environment when a new session is created or an
@@ -2674,15 +2661,6 @@ through to the terminal (which normally makes a sound).
 Also see the
 .Ic bell-action
 option.
-.It Xo Ic visual-content
-.Op Ic on | off
-.Xc
-Like
-.Ic visual-activity ,
-display a message when content is present in a window
-for which the
-.Ic monitor-content
-window option is enabled.
 .It Xo Ic visual-silence
 .Op Ic on | off
 .Xc
@@ -2864,14 +2842,6 @@ option.
 Monitor for activity in the window.
 Windows with activity are highlighted in the status line.
 .Pp
-.It Ic monitor-content Ar match-string
-Monitor content in the window.
-When
-.Xr fnmatch 3
-pattern
-.Ar match-string
-appears in the window, it is highlighted in the status line.
-.Pp
 .It Xo Ic monitor-silence
 .Op Ic interval
 .Xc
@@ -2938,14 +2908,6 @@ option.
 .Pp
 .It Ic window-status-bell-style Ar style
 Set status line style for windows with a bell alert.
-For how to specify
-.Ar style ,
-see the
-.Ic message-command-style
-option.
-.Pp
-.It Ic window-status-content-style Ar style
-Set status line style for windows with a content alert.
 For how to specify
 .Ar style ,
 see the
@@ -3091,7 +3053,7 @@ The following variables are available, where appropriate:
 .It Li "alternate_on" Ta "" Ta "If pane is in alternate screen"
 .It Li "alternate_saved_x" Ta "" Ta "Saved cursor X in alternate screen"
 .It Li "alternate_saved_y" Ta "" Ta "Saved cursor Y in alternate screen"
-.It Li "buffer_sample" Ta "" Ta "First 50 characters from buffer"
+.It Li "buffer_sample" Ta "" Ta "Sample of start of buffer"
 .It Li "buffer_size" Ta "" Ta "Size of the specified buffer in bytes"
 .It Li "client_activity" Ta "" Ta "Integer time client last had activity"
 .It Li "client_activity_string" Ta "" Ta "String time client last had activity"
@@ -3123,19 +3085,22 @@ The following variables are available, where appropriate:
 .It Li "mouse_standard_flag" Ta "" Ta "Pane mouse standard flag"
 .It Li "mouse_utf8_flag" Ta "" Ta "Pane mouse UTF-8 flag"
 .It Li "pane_active" Ta "" Ta "1 if active pane"
+.It Li "pane_bottom" Ta "" Ta "Bottom of pane"
 .It Li "pane_current_command" Ta "" Ta "Current command if available"
 .It Li "pane_current_path" Ta "" Ta "Current path if available"
 .It Li "pane_dead" Ta "" Ta "1 if pane is dead"
 .It Li "pane_height" Ta "" Ta "Height of pane"
 .It Li "pane_id" Ta "#D" Ta "Unique pane ID"
 .It Li "pane_in_mode" Ta "" Ta "If pane is in a mode"
-.It Li "pane_synchronized" Ta "" Ta "If pane is synchronized"
 .It Li "pane_index" Ta "#P" Ta "Index of pane"
+.It Li "pane_left" Ta "" Ta "Left of pane"
 .It Li "pane_pid" Ta "" Ta "PID of first process in pane"
+.It Li "pane_right" Ta "" Ta "Right of pane"
 .It Li "pane_start_command" Ta "" Ta "Command pane started with"
-.It Li "pane_start_path" Ta "" Ta "Path pane started with"
+.It Li "pane_synchronized" Ta "" Ta "If pane is synchronized"
 .It Li "pane_tabs" Ta "" Ta "Pane tab positions"
 .It Li "pane_title" Ta "#T" Ta "Title of pane"
+.It Li "pane_top" Ta "" Ta "Top of pane"
 .It Li "pane_tty" Ta "" Ta "Pseudo terminal of pane"
 .It Li "pane_width" Ta "" Ta "Width of pane"
 .It Li "saved_cursor_x" Ta "" Ta "Saved cursor X in pane"
@@ -3156,7 +3121,6 @@ The following variables are available, where appropriate:
 .It Li "window_active" Ta "" Ta "1 if window active"
 .It Li "window_activity_flag" Ta "" Ta "1 if window has activity alert"
 .It Li "window_bell_flag" Ta "" Ta "1 if window has bell"
-.It Li "window_content_flag" Ta "" Ta "1 if window has content alert"
 .It Li "window_find_matches" Ta "" Ta "Matched data from the find-window"
 .It Li "window_flags" Ta "#F" Ta "Window flags"
 .It Li "window_height" Ta "" Ta "Height of window"
@@ -3318,18 +3282,15 @@ The flag is one of the following symbols appended to the window name:
 .It Li "-" Ta "Marks the last window (previously selected)."
 .It Li "#" Ta "Window is monitored and activity has been detected."
 .It Li "!" Ta "A bell has occurred in the window."
-.It Li "+" Ta "Window is monitored for content and it has appeared."
 .It Li "~" Ta "The window has been silent for the monitor-silence interval."
 .It Li "Z" Ta "The window's active pane is zoomed."
 .El
 .Pp
 The # symbol relates to the
 .Ic monitor-activity
-and + to the
-.Ic monitor-content
-window options.
+window option.
 The window name is printed in inverted colours if an alert (bell, activity or
-content) is present.
+silence) is present.
 .Pp
 The colour and attributes of the status line may be configured, the entire
 status line using the
@@ -3443,19 +3404,40 @@ is given, otherwise the active pane for the session attached to
 .El
 .Sh BUFFERS
 .Nm
-maintains a stack of
+maintains a set of named
 .Em paste buffers .
-Up to the value of the
+Each buffer may be either explicitly or automatically named.
+Explicitly named buffers are named when created with the
+.Ic set-buffer
+or
+.Ic load-buffer
+commands, or by renaming an automatically named buffer with
+.Ic set-buffer
+.Fl n .
+Automatically named buffers are given a name such as
+.Ql buffer0001 ,
+.Ql buffer0002
+and so on.
+When the
 .Ic buffer-limit
-option are kept; when a new buffer is added, the buffer at the bottom of the
-stack is removed.
+option is reached, the oldest automatically named buffer is deleted.
+Explicitly named are not subject to
+.Ic buffer-limit
+and may be deleted with
+.Ic delete-buffer
+command.
+.Pp
 Buffers may be added using
 .Ic copy-mode
 or the
 .Ic set-buffer
-command, and pasted into a window using the
+and
+.Ic load-buffer
+commands, and pasted into a window using the
 .Ic paste-buffer
 command.
+If a buffer command is used and no buffer is specified, the most
+recently added automatically named buffer is assumed.
 .Pp
 A configurable history buffer is also maintained for each window.
 By default, up to 2000 lines are kept; this can be altered with the
@@ -3476,7 +3458,7 @@ Put a window into buffer choice mode, where a buffer may be chosen
 interactively from a list.
 After a buffer is selected,
 .Ql %%
-is replaced by the buffer index in
+is replaced by the buffer name in
 .Ar template
 and the result executed as a command.
 If
@@ -3491,11 +3473,11 @@ This command works only if at least one client is attached.
 .It Ic clear-history Op Fl t Ar target-pane
 .D1 (alias: Ic clearhist )
 Remove and free the history for the specified pane.
-.It Ic delete-buffer Op Fl b Ar buffer-index
+.It Ic delete-buffer Op Fl b Ar buffer-name
 .D1 (alias: Ic deleteb )
-Delete the buffer at
-.Ar buffer-index ,
-or the top buffer if not specified.
+Delete the buffer named
+.Ar buffer-name ,
+or the most recently added automatically named buffer if not specified.
 .It Xo Ic list-buffers
 .Op Fl F Ar format
 .Xc
@@ -3507,7 +3489,7 @@ flag, see the
 .Sx FORMATS
 section.
 .It Xo Ic load-buffer
-.Op Fl b Ar buffer-index
+.Op Fl b Ar buffer-name
 .Ar path
 .Xc
 .D1 (alias: Ic loadb )
@@ -3515,7 +3497,7 @@ Load the contents of the specified paste buffer from
 .Ar path .
 .It Xo Ic paste-buffer
 .Op Fl dpr
-.Op Fl b Ar buffer-index
+.Op Fl b Ar buffer-name
 .Op Fl s Ar separator
 .Op Fl t Ar target-pane
 .Xc
@@ -3524,7 +3506,7 @@ Insert the contents of a paste buffer into the specified pane.
 If not specified, paste into the current one.
 With
 .Fl d ,
-also delete the paste buffer from the stack.
+also delete the paste buffer.
 When output, any linefeed (LF) characters in the paste buffer are replaced with
 a separator, by default carriage return (CR).
 A custom separator may be specified using the
@@ -3539,7 +3521,7 @@ is specified, paste bracket control codes are inserted around the
 buffer if the application has requested bracketed paste mode.
 .It Xo Ic save-buffer
 .Op Fl a
-.Op Fl b Ar buffer-index
+.Op Fl b Ar buffer-name
 .Ar path
 .Xc
 .D1 (alias: Ic saveb )
@@ -3550,7 +3532,8 @@ The
 option appends to rather than overwriting the file.
 .It Xo Ic set-buffer
 .Op Fl a
-.Op Fl b Ar buffer-index
+.Op Fl b Ar buffer-name
+.Op Fl n Ar new-buffer-name
 .Ar data
 .Xc
 .D1 (alias: Ic setb )
@@ -3559,8 +3542,12 @@ Set the contents of the specified buffer to
 The
 .Fl a
 option appends to rather than overwriting the buffer.
+The
+.Fl n
+option renames the buffer to
+.Ar new-buffer-name .
 .It Xo Ic show-buffer
-.Op Fl b Ar buffer-index
+.Op Fl b Ar buffer-name
 .Xc
 .D1 (alias: Ic showb )
 Display the contents of the specified buffer.

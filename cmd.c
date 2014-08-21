@@ -34,7 +34,6 @@ const struct cmd_entry *cmd_table[] = {
 	&cmd_capture_pane_entry,
 	&cmd_choose_buffer_entry,
 	&cmd_choose_client_entry,
-	&cmd_choose_list_entry,
 	&cmd_choose_session_entry,
 	&cmd_choose_tree_entry,
 	&cmd_choose_window_entry,
@@ -180,14 +179,14 @@ cmd_unpack_argv(char *buf, size_t len, int argc, char ***argv)
 }
 
 char **
-cmd_copy_argv(int argc, char *const *argv)
+cmd_copy_argv(int argc, char **argv)
 {
 	char	**new_argv;
 	int	  i;
 
 	if (argc == 0)
 		return (NULL);
-	new_argv = xcalloc(argc, sizeof *new_argv);
+	new_argv = xcalloc(argc + 1, sizeof *new_argv);
 	for (i = 0; i < argc; i++) {
 		if (argv[i] != NULL)
 			new_argv[i] = xstrdup(argv[i]);
@@ -205,6 +204,32 @@ cmd_free_argv(int argc, char **argv)
 	for (i = 0; i < argc; i++)
 		free(argv[i]);
 	free(argv);
+}
+
+char *
+cmd_stringify_argv(int argc, char **argv)
+{
+	char	*buf;
+	int	 i;
+	size_t	 len;
+
+	if (argc == 0)
+		return (xstrdup(""));
+
+	len = 0;
+	buf = NULL;
+
+	for (i = 0; i < argc; i++) {
+		len += strlen(argv[i]) + 1;
+		buf = xrealloc(buf, 1, len);
+
+		if (i == 0)
+			*buf = '\0';
+		else
+			strlcat(buf, " ", len);
+		strlcat(buf, argv[i], len);
+	}
+	return (buf);
 }
 
 struct cmd *
@@ -769,8 +794,11 @@ cmd_find_session(struct cmd_q *cmdq, const char *arg, int prefer_unattached)
 	int			 ambiguous;
 
 	/* A NULL argument means the current session. */
-	if (arg == NULL)
-		return (cmd_current_session(cmdq, prefer_unattached));
+	if (arg == NULL) {
+		if ((s = cmd_current_session(cmdq, prefer_unattached)) == NULL)
+			cmdq_error(cmdq, "can't establish current session");
+		return (s);
+	}
 
 	/* Lookup as pane id or window id. */
 	if ((wp = cmd_lookup_paneid(arg)) != NULL)
@@ -787,7 +815,9 @@ cmd_find_session(struct cmd_q *cmdq, const char *arg, int prefer_unattached)
 	/* An empty session name is the current session. */
 	if (*tmparg == '\0') {
 		free(tmparg);
-		return (cmd_current_session(cmdq, prefer_unattached));
+		if ((s = cmd_current_session(cmdq, prefer_unattached)) == NULL)
+			cmdq_error(cmdq, "can't establish current session");
+		return (s);
 	}
 
 	/* Find the session, if any. */
