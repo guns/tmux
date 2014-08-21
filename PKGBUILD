@@ -1,6 +1,6 @@
 # Maintainer: Sung Pae <self@sungpae.com>
 pkgname=tmux-guns
-pkgver=1.8.240.ga702e76
+pkgver=
 pkgrel=1
 pkgdesc="Sung Pae's tmux build"
 arch=('x86_64')
