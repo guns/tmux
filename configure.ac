@@ -2,6 +2,8 @@
 
 # Miscellaneous autofoo bullshit.
 AC_INIT(tmux, 2.0)
+RELEASE=1.9a
+AC_SUBST(RELEASE)
 
 AC_CONFIG_AUX_DIR(etc)
 AM_INIT_AUTOMAKE([foreign subdir-objects])
@@ -384,6 +386,7 @@ AC_CHECK_FUNCS(
 	[ \
 		bzero \
 		dirfd \
+		flock \
 		setproctitle \
 		sysconf \
 		cfmakeraw \
@@ -528,5 +531,5 @@ AM_CONDITIONAL(IS_SUNOS, test "x$PLATFORM" = xsunos)
 AM_CONDITIONAL(IS_HPUX, test "x$PLATFORM" = xhpux)
 AM_CONDITIONAL(IS_UNKNOWN, test "x$PLATFORM" = xunknown)
 
-# autoconf should create a Makefile. A shock!
+# autoconf should create a Makefile.
 AC_OUTPUT(Makefile)

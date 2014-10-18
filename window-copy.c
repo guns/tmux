@@ -199,6 +199,7 @@ window_copy_init(struct window_pane *wp)
 		mode_key_init(&data->mdata, &mode_key_tree_emacs_copy);
 	else
 		mode_key_init(&data->mdata, &mode_key_tree_vi_copy);
+	s->sel.modekeys = keys;
 
 	data->backing = NULL;
 
@@ -428,7 +429,7 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 		window_pane_reset_mode(wp);
 		return;
 	case MODEKEYCOPY_OTHEREND:
-		for (; np != 0; np--)
+		if (np % 2)
 			window_copy_other_end(wp);
 		break;
 	case MODEKEYCOPY_LEFT:
@@ -793,7 +794,7 @@ window_copy_key_input(struct window_pane *wp, int key)
 		}
 		inputlen = strlen(data->inputstr);
 
-		data->inputstr = xrealloc(data->inputstr, 1, inputlen + n + 1);
+		data->inputstr = xrealloc(data->inputstr, inputlen + n + 1);
 		memcpy(data->inputstr + inputlen, pb->data, n);
 		data->inputstr[inputlen + n] = '\0';
 		break;
@@ -839,7 +840,7 @@ window_copy_key_input(struct window_pane *wp, int key)
 			break;
 		inputlen = strlen(data->inputstr) + 2;
 
-		data->inputstr = xrealloc(data->inputstr, 1, inputlen);
+		data->inputstr = xrealloc(data->inputstr, inputlen);
 		data->inputstr[inputlen - 2] = key;
 		data->inputstr[inputlen - 1] = '\0';
 		break;
@@ -1497,8 +1498,8 @@ window_copy_copy_pipe(struct window_pane *wp, struct session *sess,
 void
 window_copy_copy_selection(struct window_pane *wp, const char *bufname)
 {
-	void*	buf;
-	size_t	len;
+	void	*buf;
+	size_t	 len;
 
 	buf = window_copy_get_selection(wp, &len);
 	if (buf == NULL)
@@ -1532,7 +1533,7 @@ window_copy_append_selection(struct window_pane *wp, const char *bufname)
 	} else
 		pb = paste_get_name(bufname);
 	if (pb != NULL) {
-		buf = xrealloc(buf, 1, len + pb->size);
+		buf = xrealloc(buf, len + pb->size);
 		memmove(buf + pb->size, buf, len);
 		memcpy(buf, pb->data, pb->size);
 		len += pb->size;
@@ -1551,6 +1552,7 @@ window_copy_copy_line(struct window_pane *wp,
 	struct grid_line		*gl;
 	struct utf8_data		 ud;
 	u_int				 i, xx, wrapped = 0;
+	const char			*s;
 
 	if (sx > ex)
 		return;
@@ -1579,8 +1581,15 @@ window_copy_copy_line(struct window_pane *wp,
 			if (gc->flags & GRID_FLAG_PADDING)
 				continue;
 			grid_cell_get(gc, &ud);
+			if (ud.size == 1 && (gc->attr & GRID_ATTR_CHARSET)) {
+				s = tty_acs_get(NULL, ud.data[0]);
+				if (s != NULL && strlen(s) <= sizeof ud.data) {
+					ud.size = strlen(s);
+					memcpy (ud.data, s, ud.size);
+				}
+			}
 
-			*buf = xrealloc(*buf, 1, (*off) + ud.size);
+			*buf = xrealloc(*buf, (*off) + ud.size);
 			memcpy(*buf + *off, ud.data, ud.size);
 			*off += ud.size;
 		}
@@ -1588,7 +1597,7 @@ window_copy_copy_line(struct window_pane *wp,
 
 	/* Only add a newline if the line wasn't wrapped. */
 	if (!wrapped || ex != xx) {
-		*buf = xrealloc(*buf, 1, (*off) + 1);
+		*buf = xrealloc(*buf, (*off) + 1);
 		(*buf)[(*off)++] = '\n';
 	}
 }

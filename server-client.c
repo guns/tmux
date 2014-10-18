@@ -328,6 +328,7 @@ server_client_check_mouse(struct client *c, struct window_pane *wp)
 	if (options_get_number(oo, "mouse-select-pane") &&
 	    (m->event == MOUSE_EVENT_DOWN || m->event == MOUSE_EVENT_WHEEL)) {
 		window_set_active_at(wp->window, m->x, m->y);
+		server_status_window(wp->window);
 		server_redraw_window_borders(wp->window);
 		wp = wp->window->active; /* may have changed */
 	}
@@ -549,7 +550,7 @@ server_client_check_resize(struct window_pane *wp)
 		 * other platforms and ignoring it doesn't seem to cause any
 		 * issues.
 		 */
-		if (errno != EINVAL)
+		if (errno != EINVAL && errno != ENXIO)
 #endif
 		fatal("ioctl failed");
 	}
@@ -923,7 +924,7 @@ server_client_msg_command(struct client *c, struct imsg *imsg)
 		fatalx("bad MSG_COMMAND size");
 	memcpy(&data, imsg->data, sizeof data);
 
-	buf = (char*)imsg->data + sizeof data;
+	buf = (char *)imsg->data + sizeof data;
 	len = imsg->hdr.len  - IMSG_HEADER_SIZE - sizeof data;
 	if (len > 0 && buf[len - 1] != '\0')
 		fatalx("bad MSG_COMMAND string");

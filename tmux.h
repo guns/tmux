@@ -791,6 +791,7 @@ LIST_HEAD(joblist, job);
 struct screen_sel {
 	int		 flag;
 	int		 rectflag;
+	int		 modekeys;
 
 	u_int		 sx;
 	u_int		 sy;
@@ -953,6 +954,7 @@ struct window_pane {
 #define PANE_FOCUSED 0x4
 #define PANE_RESIZE 0x8
 #define PANE_FOCUSPUSH 0x10
+#define PANE_INPUTOFF 0x20
 
 	int		 argc;
 	char	       **argv;
@@ -1919,6 +1921,9 @@ void		 cmdq_flush(struct cmd_q *);
 int	cmd_string_parse(const char *, struct cmd_list **, const char *,
 	    u_int, char **);
 
+/* cmd-wait-for.c */
+void	cmd_wait_for_flush(void);
+
 /* client.c */
 int	client_main(int, char **, int);
 
@@ -2320,7 +2325,7 @@ void	set_signals(void(*)(int, short, void *));
 void	clear_signals(int);
 
 /* control.c */
-void	control_callback(struct client *, int, void*);
+void	control_callback(struct client *, int, void *);
 void printflike2 control_write(struct client *, const char *, ...);
 void	control_write_buffer(struct client *, struct evbuffer *);
 
@@ -2402,7 +2407,8 @@ __dead void printflike1 log_fatalx(const char *, ...);
 char		*xstrdup(const char *);
 void		*xcalloc(size_t, size_t);
 void		*xmalloc(size_t);
-void		*xrealloc(void *, size_t, size_t);
+void		*xrealloc(void *, size_t);
+void		*xreallocarray(void *, size_t, size_t);
 int printflike2	 xasprintf(char **, const char *, ...);
 int		 xvasprintf(char **, const char *, va_list);
 int printflike3	 xsnprintf(char *, size_t, const char *, ...);
