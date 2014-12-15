@@ -1,12 +1,12 @@
 # Maintainer: Sung Pae <self@sungpae.com>
-pkgname=tmux-guns
+pkgname=tmux-nerv
 pkgver=
 pkgrel=1
-pkgdesc="Sung Pae's tmux build"
+pkgdesc="Custom tmux build"
 arch=('x86_64')
 url="https://github.com/guns/tmux"
 license=('BSD')
-groups=('guns')
+groups=('nerv')
 depends=('ncurses' 'libevent' 'libutempter')
 makedepends=('git' 'ruby')
 provides=('tmux')
