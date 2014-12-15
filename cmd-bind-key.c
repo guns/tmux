@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -36,7 +36,6 @@ const struct cmd_entry cmd_bind_key_entry = {
 	"cnrt:", 1, -1,
 	"[-cnr] [-t mode-table] key command [arguments]",
 	0,
-	NULL,
 	cmd_bind_key_exec
 };
 

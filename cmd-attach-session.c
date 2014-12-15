@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -37,7 +37,6 @@ const struct cmd_entry cmd_attach_session_entry = {
 	"c:drt:", 0, 0,
 	"[-dr] [-c working-directory] " CMD_TARGET_SESSION_USAGE,
 	CMD_CANTNEST|CMD_STARTSERVER,
-	NULL,
 	cmd_attach_session_exec
 };
 

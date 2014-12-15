@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Tiago Cunha <me@tiagocunha.org>
@@ -39,7 +39,6 @@ const struct cmd_entry cmd_load_buffer_entry = {
 	"b:", 1, 1,
 	CMD_BUFFER_USAGE " path",
 	0,
-	NULL,
 	cmd_load_buffer_exec
 };
 

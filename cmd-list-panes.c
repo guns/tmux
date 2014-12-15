@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -40,7 +40,6 @@ const struct cmd_entry cmd_list_panes_entry = {
 	"asF:t:", 0, 0,
 	"[-as] [-F format] " CMD_TARGET_WINDOW_USAGE,
 	0,
-	NULL,
 	cmd_list_panes_exec
 };
 

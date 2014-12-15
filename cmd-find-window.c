@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -28,6 +28,11 @@
  * Find window containing text.
  */
 
+#define FIND_WINDOW_TEMPLATE					\
+	"#{window_index}: #{window_name} "			\
+	"[#{window_width}x#{window_height}] "			\
+	"(#{window_panes} panes) #{window_find_matches}"
+
 enum cmd_retval	 cmd_find_window_exec(struct cmd *, struct cmd_q *);
 
 void	cmd_find_window_callback(struct window_choose_data *);
@@ -47,7 +52,6 @@ const struct cmd_entry cmd_find_window_entry = {
 	"F:CNt:T", 1, 4,
 	"[-CNT] [-F format] " CMD_TARGET_WINDOW_USAGE " match-string",
 	0,
-	NULL,
 	cmd_find_window_exec
 };
 
@@ -158,7 +162,7 @@ cmd_find_window_exec(struct cmd *self, struct cmd_q *cmdq)
 
 	xasprintf(&searchstr, "*%s*", str);
 	RB_FOREACH(wm, winlinks, &s->windows)
-	    cmd_find_window_match (&find_list, match_flags, wm, str, searchstr);
+	    cmd_find_window_match(&find_list, match_flags, wm, str, searchstr);
 	free(searchstr);
 
 	if (ARRAY_LENGTH(&find_list) == 0) {

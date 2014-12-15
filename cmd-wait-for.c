@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2013 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -35,7 +35,6 @@ const struct cmd_entry cmd_wait_for_entry = {
 	"LSU", 1, 1,
 	"[-L|-S|-U] channel",
 	0,
-	NULL,
 	cmd_wait_for_exec
 };
 

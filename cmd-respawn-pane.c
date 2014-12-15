@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2008 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -35,7 +35,6 @@ const struct cmd_entry cmd_respawn_pane_entry = {
 	"kt:", 0, -1,
 	"[-k] " CMD_TARGET_PANE_USAGE " [command]",
 	0,
-	NULL,
 	cmd_respawn_pane_exec
 };
 

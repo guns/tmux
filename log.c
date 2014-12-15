@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -46,7 +46,7 @@ log_open(const char *path)
 	if (log_file == NULL)
 		return;
 
-	setlinebuf(log_file);
+	setvbuf(log_file, NULL, _IOLBF, 0);
 	event_set_log_callback(log_event_cb);
 
 	tzset();
@@ -81,7 +81,7 @@ log_vwrite(const char *msg, va_list ap)
 }
 
 /* Log a debug message. */
-void printflike1
+void
 log_debug(const char *msg, ...)
 {
 	va_list	ap;
@@ -92,7 +92,7 @@ log_debug(const char *msg, ...)
 }
 
 /* Log a critical error with error string and die. */
-__dead void printflike1
+__dead void
 log_fatal(const char *msg, ...)
 {
 	char	*fmt;
@@ -106,7 +106,7 @@ log_fatal(const char *msg, ...)
 }
 
 /* Log a critical error and die. */
-__dead void printflike1
+__dead void
 log_fatalx(const char *msg, ...)
 {
 	char	*fmt;

@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -98,7 +98,7 @@ window_choose_add(struct window_pane *wp, struct window_choose_data *wcd)
 	item->pos = ARRAY_LENGTH(&data->list) - 1;
 	item->state = 0;
 
-	data->width = xsnprintf (tmp, sizeof tmp , "%u", item->pos);
+	data->width = xsnprintf(tmp, sizeof tmp , "%u", item->pos);
 }
 
 void
@@ -787,9 +787,9 @@ window_choose_write_line(
 
 		key = window_choose_key_index(data, data->top + py);
 		if (key != -1)
-			xsnprintf (label, sizeof label, "(%c)", key);
+			xsnprintf(label, sizeof label, "(%c)", key);
 		else
-			xsnprintf (label, sizeof label, "(%d)", item->pos);
+			xsnprintf(label, sizeof label, "(%d)", item->pos);
 		screen_write_nputs(ctx, screen_size_x(s) - 1, &gc, utf8flag,
 		    "%*s %s %s", data->width + 2, label,
 		    /*
@@ -929,36 +929,6 @@ window_choose_add_session(struct window_pane *wp, struct client *c,
 	window_choose_add(wp, wcd);
 
 	return (wcd);
-}
-
-struct window_choose_data *
-window_choose_add_item(struct window_pane *wp, struct client *c,
-    struct winlink *wl, const char *template, const char *action, u_int idx)
-{
-	struct window_choose_data	*wcd;
-	char				*expanded;
-
-	wcd = window_choose_data_create(TREE_OTHER, c, c->session);
-	wcd->idx = wl->idx;
-
-	wcd->ft_template = xstrdup(template);
-	format_add(wcd->ft, "line", "%u", idx);
-	format_session(wcd->ft, wcd->start_session);
-	format_winlink(wcd->ft, wcd->start_session, wl);
-	format_window_pane(wcd->ft, wl->window->active);
-
-	/*
-	 * Interpolate action here, since the data we pass back is the expanded
-	 * template itself.
-	 */
-	xasprintf(&expanded, "%s", format_expand(wcd->ft, wcd->ft_template));
-	wcd->command = cmd_template_replace(action, expanded, 1);
-	free(expanded);
-
-	window_choose_add(wp, wcd);
-
-	return (wcd);
-
 }
 
 struct window_choose_data *

@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2011 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -17,6 +17,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -39,8 +40,26 @@ int	 format_replace(struct format_tree *, const char *, size_t, char **,
 char	*format_get_command(struct window_pane *);
 void	 format_window_pane_tabs(struct format_tree *, struct window_pane *);
 
+/* Entry in format tree. */
+struct format_entry {
+	char		       *key;
+	char		       *value;
+
+	RB_ENTRY(format_entry)	entry;
+};
+
+/* Tree of format entries. */
+struct format_tree {
+	struct window	*w;
+	struct session	*s;
+
+	RB_HEAD(format_rb_tree, format_entry) tree;
+};
+
 /* Format key-value replacement entry. */
-RB_GENERATE(format_tree, format_entry, entry, format_cmp);
+int	format_cmp(struct format_entry *, struct format_entry *);
+RB_PROTOTYPE(format_rb_tree, format_entry, entry, format_cmp);
+RB_GENERATE(format_rb_tree, format_entry, entry, format_cmp);
 
 /* Format tree comparison function. */
 int
@@ -116,8 +135,8 @@ format_create(void)
 	struct format_tree	*ft;
 	char			 host[MAXHOSTNAMELEN], *ptr;
 
-	ft = xmalloc(sizeof *ft);
-	RB_INIT(ft);
+	ft = xcalloc(1, sizeof *ft);
+	RB_INIT(&ft->tree);
 
 	if (gethostname(host, sizeof host) == 0) {
 		format_add(ft, "host", "%s", host);
@@ -133,14 +152,10 @@ format_create(void)
 void
 format_free(struct format_tree *ft)
 {
-	struct format_entry	*fe, *fe_next;
+	struct format_entry	*fe, *fe1;
 
-	fe_next = RB_MIN(format_tree, ft);
-	while (fe_next != NULL) {
-		fe = fe_next;
-		fe_next = RB_NEXT(format_tree, ft, fe);
-
-		RB_REMOVE(format_tree, ft, fe);
+	RB_FOREACH_SAFE(fe, format_rb_tree, &ft->tree, fe1) {
+		RB_REMOVE(format_rb_tree, &ft->tree, fe);
 		free(fe->value);
 		free(fe->key);
 		free(fe);
@@ -164,7 +179,7 @@ format_add(struct format_tree *ft, const char *key, const char *fmt, ...)
 	xvasprintf(&fe->value, fmt, ap);
 	va_end(ap);
 
-	fe_now = RB_INSERT(format_tree, ft, fe);
+	fe_now = RB_INSERT(format_rb_tree, &ft->tree, fe);
 	if (fe_now != NULL) {
 		free(fe_now->value);
 		fe_now->value = fe->value;
@@ -178,9 +193,32 @@ const char *
 format_find(struct format_tree *ft, const char *key)
 {
 	struct format_entry	*fe, fe_find;
+	struct options_entry	*o;
+	static char		 s[16];
+
+	o = options_find(&global_options, key);
+	if (o == NULL && ft->w != NULL)
+		o = options_find(&ft->w->options, key);
+	if (o == NULL)
+		o = options_find(&global_w_options, key);
+	if (o == NULL && ft->s != NULL)
+		o = options_find(&ft->s->options, key);
+	if (o == NULL)
+		o = options_find(&global_s_options, key);
+	if (o != NULL) {
+		switch (o->type) {
+		case OPTIONS_STRING:
+			return (o->str);
+		case OPTIONS_NUMBER:
+			snprintf(s, sizeof s, "%lld", o->num);
+			return (s);
+		case OPTIONS_STYLE:
+			return (style_tostring(&o->style));
+		}
+	}
 
 	fe_find.key = (char *) key;
-	fe = RB_FIND(format_tree, ft, &fe_find);
+	fe = RB_FIND(format_rb_tree, &ft->tree, &fe_find);
 	if (fe == NULL)
 		return (NULL);
 	return (fe->value);
@@ -205,7 +243,7 @@ format_replace(struct format_tree *ft, const char *key, size_t keylen,
 	copy[keylen] = '\0';
 
 	/* Is there a length limit or whatnot? */
-	if (!islower((u_char) *copy) && *copy != '?') {
+	if (!islower((u_char) *copy) && *copy != '@' && *copy != '?') {
 		while (*copy != ':' && *copy != '\0') {
 			switch (*copy) {
 			case '=':
@@ -236,7 +274,8 @@ format_replace(struct format_tree *ft, const char *key, size_t keylen,
 		*ptr = '\0';
 
 		value = format_find(ft, copy + 1);
-		if (value != NULL && (value[0] != '0' || value[1] != '\0')) {
+		if (value != NULL && *value != '\0' &&
+		    (value[0] != '0' || value[1] != '\0')) {
 			value = ptr + 1;
 			ptr = strchr(value, ',');
 			if (ptr == NULL)
@@ -387,6 +426,8 @@ format_session(struct format_tree *ft, struct session *s)
 	char			*tim;
 	time_t			 t;
 
+	ft->s = s;
+
 	format_add(ft, "session_name", "%s", s->name);
 	format_add(ft, "session_windows", "%u", winlink_count(&s->windows));
 	format_add(ft, "session_width", "%u", s->sx);
@@ -415,6 +456,9 @@ format_client(struct format_tree *ft, struct client *c)
 	char		*tim;
 	time_t		 t;
 	struct session	*s;
+
+	if (ft->s == NULL)
+		ft->s = c->session;
 
 	format_add(ft, "client_height", "%u", c->tty.sy);
 	format_add(ft, "client_width", "%u", c->tty.sx);
@@ -461,6 +505,8 @@ format_window(struct format_tree *ft, struct window *w)
 {
 	char	*layout;
 
+	ft->w = w;
+
 	layout = layout_dump(w);
 
 	format_add(ft, "window_id", "@%u", w->id);
@@ -469,6 +515,8 @@ format_window(struct format_tree *ft, struct window *w)
 	format_add(ft, "window_height", "%u", w->sy);
 	format_add(ft, "window_layout", "%s", layout);
 	format_add(ft, "window_panes", "%u", window_count_panes(w));
+	format_add(ft, "window_zoomed_flag", "%u",
+	    !!(w->flags & WINDOW_ZOOMED));
 
 	free(layout);
 }
@@ -479,6 +527,9 @@ format_winlink(struct format_tree *ft, struct session *s, struct winlink *wl)
 {
 	struct window	*w = wl->window;
 	char		*flags;
+
+	if (ft->w == NULL)
+		ft->w = wl->window;
 
 	flags = window_printable_flags(s, wl);
 
@@ -496,8 +547,6 @@ format_winlink(struct format_tree *ft, struct session *s, struct winlink *wl)
 	    !!(wl->flags & WINLINK_SILENCE));
 	format_add(ft, "window_last_flag", "%u",
 	    !!(wl == TAILQ_FIRST(&s->lastw)));
-	format_add(ft, "window_zoomed_flag", "%u",
-	    !!(wl->flags & WINDOW_ZOOMED));
 
 	free(flags);
 }
@@ -534,6 +583,9 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 	u_int			 i, idx;
 	char			*cmd, *cwd;
 
+	if (ft->w == NULL)
+		ft->w = wp->window;
+
 	size = 0;
 	for (i = 0; i < gd->hsize; i++) {
 		gl = &gd->linedata[i];
@@ -554,6 +606,7 @@ format_window_pane(struct format_tree *ft, struct window_pane *wp)
 	format_add(ft, "pane_id", "%%%u", wp->id);
 	format_add(ft, "pane_active", "%d", wp == wp->window->active);
 	format_add(ft, "pane_dead", "%d", wp->fd == -1);
+	format_add(ft, "pane_input_off", "%d", !!(wp->flags & PANE_INPUTOFF));
 
 	if (window_pane_visible(wp)) {
 		format_add(ft, "pane_left", "%u", wp->xoff);

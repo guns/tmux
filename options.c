@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $OpenBSD$ */
 
 /*
  * Copyright (c) 2008 Nicholas Marriott <nicm@users.sourceforge.net>
@@ -99,7 +99,7 @@ options_remove(struct options *oo, const char *name)
 	free(o);
 }
 
-struct options_entry *printflike3
+struct options_entry *
 options_set_string(struct options *oo, const char *name, const char *fmt, ...)
 {
 	struct options_entry	*o;

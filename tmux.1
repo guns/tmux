@@ -879,10 +879,10 @@ The following keys are supported as appropriate for the mode:
 .It Sy "Function" Ta Sy "vi" Ta Sy "emacs"
 .It Li "Append selection" Ta "A" Ta ""
 .It Li "Back to indentation" Ta "^" Ta "M-m"
-.It Li "Copy to named buffer" Ta \&" Ta ""
 .It Li "Bottom of history" Ta "G" Ta "M-<"
 .It Li "Clear selection" Ta "Escape" Ta "C-g"
 .It Li "Copy selection" Ta "Enter" Ta "M-w"
+.It Li "Copy to named buffer" Ta \&" Ta ""
 .It Li "Cursor down" Ta "j" Ta "Down"
 .It Li "Cursor left" Ta "h" Ta "Left"
 .It Li "Cursor right" Ta "l" Ta "Right"
@@ -896,12 +896,12 @@ The following keys are supported as appropriate for the mode:
 .It Li "Go to line" Ta ":" Ta "g"
 .It Li "Half page down" Ta "C-d" Ta "M-Down"
 .It Li "Half page up" Ta "C-u" Ta "M-Up"
-.It Li "Jump forward" Ta "f" Ta "f"
-.It Li "Jump to forward" Ta "t" Ta ""
-.It Li "Jump backward" Ta "F" Ta "F"
-.It Li "Jump to backward" Ta "T" Ta ""
 .It Li "Jump again" Ta ";" Ta ";"
 .It Li "Jump again in reverse" Ta "," Ta ","
+.It Li "Jump backward" Ta "F" Ta "F"
+.It Li "Jump forward" Ta "f" Ta "f"
+.It Li "Jump to backward" Ta "T" Ta ""
+.It Li "Jump to forward" Ta "t" Ta ""
 .It Li "Next page" Ta "C-f" Ta "Page down"
 .It Li "Next space" Ta "W" Ta ""
 .It Li "Next space, end of word" Ta "E" Ta ""
@@ -910,8 +910,8 @@ The following keys are supported as appropriate for the mode:
 .It Li "Other end of selection" Ta "o" Ta ""
 .It Li "Paste buffer" Ta "p" Ta "C-y"
 .It Li "Previous page" Ta "C-b" Ta "Page up"
-.It Li "Previous word" Ta "b" Ta "M-b"
 .It Li "Previous space" Ta "B" Ta ""
+.It Li "Previous word" Ta "b" Ta "M-b"
 .It Li "Quit mode" Ta "q" Ta "Escape"
 .It Li "Rectangle toggle" Ta "v" Ta "R"
 .It Li "Scroll down" Ta "C-Down or C-e" Ta "C-Down"
@@ -920,6 +920,7 @@ The following keys are supported as appropriate for the mode:
 .It Li "Search again in reverse" Ta "N" Ta "N"
 .It Li "Search backward" Ta "?" Ta "C-r"
 .It Li "Search forward" Ta "/" Ta "C-s"
+.It Li "Select line" Ta "V" Ta ""
 .It Li "Start of line" Ta "0" Ta "C-a"
 .It Li "Start selection" Ta "Space" Ta "C-Space"
 .It Li "Top of history" Ta "g" Ta "M->"
@@ -1760,7 +1761,7 @@ is given and the selected window is already the current window,
 the command behaves like
 .Ic last-window .
 .It Xo Ic split-window
-.Op Fl dhvP
+.Op Fl bdhvP
 .Op Fl c Ar start-directory
 .Oo Fl l
 .Ar size |
@@ -1784,6 +1785,10 @@ and
 .Fl p
 options specify the size of the new pane in lines (for vertical split) or in
 cells (for horizontal split), or as a percentage, respectively.
+The
+.Fl b
+option causes the new pane to be created to the left of or above
+.Ar target-pane .
 All other options have the same meaning as for the
 .Ic new-window
 command.
@@ -2585,6 +2590,9 @@ By default, UTF-8 in
 is not interpreted, to enable UTF-8, use the
 .Ic status-utf8
 option.
+.Pp
+The default is
+.Ql "[#S] " .
 .It Ic status-left-length Ar length
 Set the maximum
 .Ar length
@@ -3035,12 +3043,17 @@ and
 .Ql } ,
 for example
 .Ql #{session_name} .
-Some variables also have an shorter alias such as
-.Ql #S .
+The possible variables are listed in the table below, or the name of a
+.Nm
+option may be used for an option's value.
+Some variables have a shorter alias such as
+.Ql #S ,
+and
 .Ql ##
 is replaced by a single
 .Ql # .
-Conditionals are also accepted by prefixing with
+.Pp
+Conditionals are available by prefixing with
 .Ql \&?
 and separating two alternatives with a comma;
 if the specified variable exists and is not zero, the first alternative
@@ -3051,7 +3064,15 @@ will include the string
 .Ql attached
 if the session is attached and the string
 .Ql not attached
-if it is unattached.
+if it is unattached, or
+.Ql #{?automatic-rename,yes,no}
+will include
+.Ql yes
+if
+.Ic automatic-rename
+is enabled, or
+.Ql no
+if not.
 A limit may be placed on the length of the resultant string by prefixing it
 by an
 .Ql = ,
@@ -3104,6 +3125,7 @@ The following variables are available, where appropriate:
 .It Li "pane_height" Ta "" Ta "Height of pane"
 .It Li "pane_id" Ta "#D" Ta "Unique pane ID"
 .It Li "pane_in_mode" Ta "" Ta "If pane is in a mode"
+.It Li "pane_input_off" Ta "" Ta "If input to pane is disabled"
 .It Li "pane_index" Ta "#P" Ta "Index of pane"
 .It Li "pane_left" Ta "" Ta "Left of pane"
 .It Li "pane_pid" Ta "" Ta "PID of first process in pane"
@@ -3572,7 +3594,7 @@ Miscellaneous commands are as follows:
 .It Ic clock-mode Op Fl t Ar target-pane
 Display a large clock.
 .It Xo Ic if-shell
-.Op Fl b
+.Op Fl bF
 .Op Fl t Ar target-pane
 .Ar shell-command command
 .Op Ar command
@@ -3585,7 +3607,9 @@ if
 returns success or the second
 .Ar command
 otherwise.
-Before being executed, shell-command is expanded using the rules specified in the
+Before being executed,
+.Ar shell-command
+is expanded using the rules specified in the
 .Sx FORMATS
 section, including those relevant to
 .Ar target-pane .
@@ -3593,6 +3617,13 @@ With
 .Fl b ,
 .Ar shell-command
 is run in the background.
+.Pp
+If
+.Fl F
+is given,
+.Ar shell-command
+is not executed but considered success if neither empty nor zero (after formats
+are expanded).
 .It Ic lock-server
 .D1 (alias: Ic lock )
 Lock each client individually by running the command specified by the
@@ -3653,7 +3684,7 @@ to change the cursor colour from inside
 $ printf '\e033]12;red\e033\e\e'
 .Ed
 .It Em \&Ss , Se
-Change the cursor style.
+Set or reset the cursor style.
 If set, a sequence such as this may be used
 to change the cursor to an underline:
 .Bd -literal -offset indent
@@ -3661,10 +3692,8 @@ $ printf '\e033[4 q'
 .Ed
 .Pp
 If
-.Em Csr
-is set, it will be used to reset the cursor style instead
-of
-.Em Cs .
+.Em Se
+is not set, \&Ss with argument 0 will be used to reset the cursor style instead.
 .It Em \&Ms
 This sequence can be used by
 .Nm
