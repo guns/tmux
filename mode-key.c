@@ -258,7 +258,7 @@ struct mode_key_tree mode_key_tree_vi_choice;
 
 /* vi copy mode keys. */
 const struct mode_key_entry mode_key_vi_copy[] = {
-	{ 'v',			    0, MODEKEYCOPY_STARTSELECTION },
+	{ ' ',			    0, MODEKEYCOPY_STARTSELECTION },
 	{ '"',			    0, MODEKEYCOPY_STARTNAMEDBUFFER },
 	{ '$',			    0, MODEKEYCOPY_ENDOFLINE },
 	{ ',',			    0, MODEKEYCOPY_JUMPREVERSE },
@@ -311,12 +311,11 @@ const struct mode_key_entry mode_key_vi_copy[] = {
 	{ 'j',			    0, MODEKEYCOPY_DOWN },
 	{ 'k',			    0, MODEKEYCOPY_UP },
 	{ 'l',			    0, MODEKEYCOPY_RIGHT },
-	{ ' ',			    0, MODEKEYCOPY_RIGHT },
 	{ 'n',			    0, MODEKEYCOPY_SEARCHAGAIN },
 	{ 'o',			    0, MODEKEYCOPY_OTHEREND },
 	{ 't',			    0, MODEKEYCOPY_JUMPTO },
 	{ 'q',			    0, MODEKEYCOPY_CANCEL },
-	{ '\026' /* C-v */,	    0, MODEKEYCOPY_RECTANGLETOGGLE },
+	{ 'v',			    0, MODEKEYCOPY_RECTANGLETOGGLE },
 	{ 'w',			    0, MODEKEYCOPY_NEXTWORD },
 	{ KEYC_BSPACE,		    0, MODEKEYCOPY_LEFT },
 	{ KEYC_DOWN | KEYC_CTRL,    0, MODEKEYCOPY_SCROLLDOWN },
