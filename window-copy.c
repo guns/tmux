@@ -27,11 +27,10 @@
 struct screen *window_copy_init(struct window_pane *);
 void	window_copy_free(struct window_pane *);
 void	window_copy_resize(struct window_pane *, u_int, u_int);
-void	window_copy_key(struct window_pane *, struct session *, int);
+void	window_copy_key(struct window_pane *, struct client *, struct session *,
+	    int, struct mouse_event *);
 int	window_copy_key_input(struct window_pane *, int);
 int	window_copy_key_numeric_prefix(struct window_pane *, int);
-void	window_copy_mouse(struct window_pane *, struct session *,
-	    struct mouse_event *);
 
 void	window_copy_redraw_selection(struct window_pane *, u_int);
 void	window_copy_redraw_lines(struct window_pane *, u_int, u_int);
@@ -76,22 +75,22 @@ void	window_copy_cursor_up(struct window_pane *, int);
 void	window_copy_cursor_down(struct window_pane *, int);
 void	window_copy_cursor_jump(struct window_pane *);
 void	window_copy_cursor_jump_back(struct window_pane *);
-void	window_copy_cursor_jump_to(struct window_pane *);
-void	window_copy_cursor_jump_to_back(struct window_pane *);
+void	window_copy_cursor_jump_to(struct window_pane *, int);
+void	window_copy_cursor_jump_to_back(struct window_pane *, int);
 void	window_copy_cursor_next_word(struct window_pane *, const char *);
 void	window_copy_cursor_next_word_end(struct window_pane *, const char *);
 void	window_copy_cursor_previous_word(struct window_pane *, const char *);
 void	window_copy_scroll_up(struct window_pane *, u_int);
 void	window_copy_scroll_down(struct window_pane *, u_int);
 void	window_copy_rectangle_toggle(struct window_pane *);
+void	window_copy_drag_update(struct client *, struct mouse_event *);
+void	window_copy_drag_release(struct client *, struct mouse_event *);
 
 const struct window_mode window_copy_mode = {
 	window_copy_init,
 	window_copy_free,
 	window_copy_resize,
 	window_copy_key,
-	window_copy_mouse,
-	NULL,
 };
 
 enum window_copy_input_type {
@@ -124,37 +123,39 @@ enum window_copy_input_type {
  * mode ends).
  */
 struct window_copy_mode_data {
-	struct screen	screen;
+	struct screen		 screen;
 
-	struct screen  *backing;
-	int		backing_written; /* backing display has started */
+	struct screen		*backing;
+	int			 backing_written; /* backing display started */
 
-	struct mode_key_data mdata;
+	struct mode_key_data	 mdata;
 
-	u_int		oy;
+	u_int			 oy;
 
-	u_int		selx;
-	u_int		sely;
+	u_int			 selx;
+	u_int			 sely;
 
-	u_int		rectflag; /* are we in rectangle copy mode? */
+	int			 rectflag;	/* in rectangle copy mode? */
+	int			 scroll_exit;	/* exit on scroll to end? */
 
-	u_int		cx;
-	u_int		cy;
+	u_int			 cx;
+	u_int			 cy;
 
-	u_int		lastcx; /* position in last line with content */
-	u_int		lastsx; /* size of last line with content */
+	u_int			 lastcx; /* position in last line w/ content */
+	u_int			 lastsx; /* size of last line w/ content */
 
 	enum window_copy_input_type inputtype;
-	const char     *inputprompt;
-	char	       *inputstr;
+	const char		*inputprompt;
+	char			*inputstr;
+	int			 inputexit;
 
-	int		numprefix;
+	int			 numprefix;
 
 	enum window_copy_input_type searchtype;
-	char	       *searchstr;
+	char			*searchstr;
 
 	enum window_copy_input_type jumptype;
-	char		jumpchar;
+	char			 jumpchar;
 };
 
 struct screen *
@@ -175,6 +176,7 @@ window_copy_init(struct window_pane *wp)
 	data->backing_written = 0;
 
 	data->rectflag = 0;
+	data->scroll_exit = 0;
 
 	data->inputtype = WINDOW_COPY_OFF;
 	data->inputprompt = NULL;
@@ -192,8 +194,6 @@ window_copy_init(struct window_pane *wp)
 
 	s = &data->screen;
 	screen_init(s, screen_size_x(&wp->base), screen_size_y(&wp->base), 0);
-	if (options_get_number(&wp->window->options, "mode-mouse"))
-		s->mode |= MODE_MOUSE_STANDARD;
 
 	keys = options_get_number(&wp->window->options, "mode-keys");
 	if (keys == MODEKEY_EMACS)
@@ -208,7 +208,7 @@ window_copy_init(struct window_pane *wp)
 }
 
 void
-window_copy_init_from_pane(struct window_pane *wp)
+window_copy_init_from_pane(struct window_pane *wp, int scroll_exit)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct screen			*s = &data->screen;
@@ -221,6 +221,7 @@ window_copy_init_from_pane(struct window_pane *wp)
 	data->backing = &wp->base;
 	data->cx = data->backing->cx;
 	data->cy = data->backing->cy;
+	data->scroll_exit = scroll_exit;
 
 	s->cx = data->cx;
 	s->cy = data->cy;
@@ -366,19 +367,20 @@ window_copy_resize(struct window_pane *wp, u_int sx, u_int sy)
 }
 
 void
-window_copy_key(struct window_pane *wp, struct session *sess, int key)
+window_copy_key(struct window_pane *wp, struct client *c, struct session *sess,
+    int key, struct mouse_event *m)
 {
 	const char			*word_separators;
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct screen			*s = &data->screen;
-	u_int				 n;
-	int				 np, keys;
+	u_int				 n, np;
+	int				 keys;
 	enum mode_key_cmd		 cmd;
 	const char			*arg, *ss;
 
-	np = data->numprefix;
-	if (np <= 0)
-		np = 1;
+	np = 1;
+	if (data->numprefix > 0)
+		np = data->numprefix;
 
 	if (data->inputtype == WINDOW_COPY_JUMPFORWARD ||
 	    data->inputtype == WINDOW_COPY_JUMPBACK ||
@@ -397,11 +399,11 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 			}
 			if (data->inputtype == WINDOW_COPY_JUMPTOFORWARD) {
 				for (; np != 0; np--)
-					window_copy_cursor_jump_to(wp);
+					window_copy_cursor_jump_to(wp, 0);
 			}
 			if (data->inputtype == WINDOW_COPY_JUMPTOBACK) {
 				for (; np != 0; np--)
-					window_copy_cursor_jump_to_back(wp);
+					window_copy_cursor_jump_to_back(wp, 0);
 			}
 		}
 		data->jumptype = data->inputtype;
@@ -420,12 +422,23 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 	}
 
 	cmd = mode_key_lookup(&data->mdata, key, &arg);
+	if (cmd != MODEKEYCOPY_PREVIOUSPAGE &&
+	    cmd != MODEKEYCOPY_NEXTPAGE &&
+	    cmd != MODEKEYCOPY_SCROLLUP &&
+	    cmd != MODEKEYCOPY_SCROLLDOWN &&
+	    cmd != MODEKEYCOPY_HALFPAGEUP &&
+	    cmd != MODEKEYCOPY_HALFPAGEDOWN)
+		data->scroll_exit = 0;
 	switch (cmd) {
 	case MODEKEYCOPY_APPENDSELECTION:
 		if (sess != NULL) {
 			window_copy_append_selection(wp, NULL);
-			window_pane_reset_mode(wp);
-			return;
+			if (arg == NULL) {
+				window_pane_reset_mode(wp);
+				return;
+			}
+			window_copy_clear_selection(wp);
+			window_copy_redraw_screen(wp);
 		}
 		break;
 	case MODEKEYCOPY_CANCEL:
@@ -458,6 +471,10 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 	case MODEKEYCOPY_SCROLLDOWN:
 		for (; np != 0; np--)
 			window_copy_cursor_down(wp, 1);
+		if (data->scroll_exit && data->oy == 0) {
+			window_pane_reset_mode(wp);
+			return;
+		}
 		break;
 	case MODEKEYCOPY_PREVIOUSPAGE:
 		for (; np != 0; np--)
@@ -472,6 +489,10 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 				data->oy = 0;
 			else
 				data->oy -= n;
+		}
+		if (data->scroll_exit && data->oy == 0) {
+			window_pane_reset_mode(wp);
+			return;
 		}
 		window_copy_update_selection(wp, 1);
 		window_copy_redraw_screen(wp);
@@ -494,6 +515,10 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 				data->oy = 0;
 			else
 				data->oy -= n;
+		}
+		if (data->scroll_exit && data->oy == 0) {
+			window_pane_reset_mode(wp);
+			return;
 		}
 		window_copy_update_selection(wp, 1);
 		window_copy_redraw_screen(wp);
@@ -531,9 +556,14 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 		window_copy_redraw_screen(wp);
 		break;
 	case MODEKEYCOPY_STARTSELECTION:
-		s->sel.lineflag = LINE_SEL_NONE;
-		window_copy_start_selection(wp);
-		window_copy_redraw_screen(wp);
+		if (KEYC_IS_MOUSE(key)) {
+			if (c != NULL)
+				window_copy_start_drag(c, m);
+		} else {
+			s->sel.lineflag = LINE_SEL_NONE;
+			window_copy_start_selection(wp);
+			window_copy_redraw_screen(wp);
+		}
 		break;
 	case MODEKEYCOPY_SELECTLINE:
 		s->sel.lineflag = LINE_SEL_LEFT_RIGHT;
@@ -572,8 +602,12 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 	case MODEKEYCOPY_COPYSELECTION:
 		if (sess != NULL) {
 			window_copy_copy_selection(wp, NULL);
-			window_pane_reset_mode(wp);
-			return;
+			if (arg == NULL) {
+				window_pane_reset_mode(wp);
+				return;
+			}
+			window_copy_clear_selection(wp);
+			window_copy_redraw_screen(wp);
 		}
 		break;
 	case MODEKEYCOPY_STARTOFLINE:
@@ -630,10 +664,10 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 				window_copy_cursor_jump_back(wp);
 		} else if (data->jumptype == WINDOW_COPY_JUMPTOFORWARD) {
 			for (; np != 0; np--)
-				window_copy_cursor_jump_to(wp);
+				window_copy_cursor_jump_to(wp, 1);
 		} else if (data->jumptype == WINDOW_COPY_JUMPTOBACK) {
 			for (; np != 0; np--)
-				window_copy_cursor_jump_to_back(wp);
+				window_copy_cursor_jump_to_back(wp, 1);
 		}
 		break;
 	case MODEKEYCOPY_JUMPREVERSE:
@@ -645,10 +679,10 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 				window_copy_cursor_jump(wp);
 		} else if (data->jumptype == WINDOW_COPY_JUMPTOFORWARD) {
 			for (; np != 0; np--)
-				window_copy_cursor_jump_to_back(wp);
+				window_copy_cursor_jump_to_back(wp, 1);
 		} else if (data->jumptype == WINDOW_COPY_JUMPTOBACK) {
 			for (; np != 0; np--)
-				window_copy_cursor_jump_to(wp);
+				window_copy_cursor_jump_to(wp, 1);
 		}
 		break;
 	case MODEKEYCOPY_JUMPBACK:
@@ -718,6 +752,7 @@ window_copy_key(struct window_pane *wp, struct session *sess, int key)
 		goto input_on;
 	case MODEKEYCOPY_STARTNAMEDBUFFER:
 		data->inputtype = WINDOW_COPY_NAMEDBUFFER;
+		data->inputexit = (arg == NULL);
 		data->inputprompt = "Buffer";
 		*data->inputstr = '\0';
 		goto input_on;
@@ -769,7 +804,8 @@ window_copy_key_input(struct window_pane *wp, int key)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct screen			*s = &data->screen;
-	size_t				 inputlen, n;
+	const char			*bufdata;
+	size_t				 inputlen, n, bufsize;
 	int				 np;
 	struct paste_buffer		*pb;
 	u_char				 ch;
@@ -787,17 +823,18 @@ window_copy_key_input(struct window_pane *wp, int key)
 		*data->inputstr = '\0';
 		break;
 	case MODEKEYEDIT_PASTE:
-		if ((pb = paste_get_top()) == NULL)
+		if ((pb = paste_get_top(NULL)) == NULL)
 			break;
-		for (n = 0; n < pb->size; n++) {
-			ch = (u_char) pb->data[n];
+		bufdata = paste_buffer_data(pb, &bufsize);
+		for (n = 0; n < bufsize; n++) {
+			ch = (u_char)bufdata[n];
 			if (ch < 32 || ch == 127)
 				break;
 		}
 		inputlen = strlen(data->inputstr);
 
 		data->inputstr = xrealloc(data->inputstr, inputlen + n + 1);
-		memcpy(data->inputstr + inputlen, pb->data, n);
+		memcpy(data->inputstr + inputlen, bufdata, n);
 		data->inputstr[inputlen + n] = '\0';
 		break;
 	case MODEKEYEDIT_ENTER:
@@ -828,8 +865,13 @@ window_copy_key_input(struct window_pane *wp, int key)
 		case WINDOW_COPY_NAMEDBUFFER:
 			window_copy_copy_selection(wp, data->inputstr);
 			*data->inputstr = '\0';
-			window_pane_reset_mode(wp);
-			return (0);
+			if (data->inputexit) {
+				window_pane_reset_mode(wp);
+				return (0);
+			}
+			window_copy_clear_selection(wp);
+			window_copy_redraw_screen(wp);
+			break;
 		case WINDOW_COPY_GOTOLINE:
 			window_copy_goto_line(wp, data->inputstr);
 			*data->inputstr = '\0';
@@ -870,75 +912,6 @@ window_copy_key_numeric_prefix(struct window_pane *wp, int key)
 
 	window_copy_redraw_lines(wp, screen_size_y(s) - 1, 1);
 	return (0);
-}
-
-void
-window_copy_mouse(struct window_pane *wp, struct session *sess,
-    struct mouse_event *m)
-{
-	struct window_copy_mode_data	*data = wp->modedata;
-	struct screen			*s = &data->screen;
-	u_int				 i, old_cy;
-
-	if (m->x >= screen_size_x(s))
-		return;
-	if (m->y >= screen_size_y(s))
-		return;
-
-	/* If mouse wheel (buttons 4 and 5), scroll. */
-	if (m->event == MOUSE_EVENT_WHEEL) {
-		for (i = 0; i < m->scroll; i++) {
-			if (m->wheel == MOUSE_WHEEL_UP)
-				window_copy_cursor_up(wp, 1);
-			else {
-				window_copy_cursor_down(wp, 1);
-
-				/*
-				 * We reached the bottom, leave copy mode, but
-				 * only if no selection is in progress.
-				 */
-				if (data->oy == 0 && !s->sel.flag &&
-				    s->sel.lineflag == LINE_SEL_NONE)
-					goto reset_mode;
-			}
-		}
-		return;
-	}
-
-	/*
-	 * If already reading motion, move the cursor while buttons are still
-	 * pressed, or stop the selection on their release.
-	 */
-	if (s->mode & MODE_MOUSE_BUTTON) {
-		if (~m->event & MOUSE_EVENT_UP) {
-			old_cy = data->cy;
-			window_copy_update_cursor(wp, m->x, m->y);
-			if (window_copy_update_selection(wp, 1))
-				window_copy_redraw_selection(wp, old_cy);
-			return;
-		}
-		goto reset_mode;
-	}
-
-	/* Otherwise if other buttons pressed, start selection and motion. */
-	if (~m->event & MOUSE_EVENT_UP) {
-		s->mode &= ~MODE_MOUSE_STANDARD;
-		s->mode |= MODE_MOUSE_BUTTON;
-
-		window_copy_update_cursor(wp, m->x, m->y);
-		window_copy_start_selection(wp);
-		window_copy_redraw_screen(wp);
-	}
-
-	return;
-
-reset_mode:
-	s->mode &= ~MODE_MOUSE_BUTTON;
-	s->mode |= MODE_MOUSE_STANDARD;
-	if (sess != NULL) {
-		window_copy_copy_selection(wp, NULL);
-		window_pane_reset_mode(wp);
-	}
 }
 
 void
@@ -1216,7 +1189,7 @@ window_copy_write_line(struct window_pane *wp, struct screen_write_ctx *ctx,
 			limit = screen_size_x(s) + 1;
 		if (data->inputtype == WINDOW_COPY_NUMERICPREFIX) {
 			xoff = size = xsnprintf(hdr, limit,
-			    "Repeat: %u", data->numprefix);
+			    "Repeat: %d", data->numprefix);
 		} else {
 			xoff = size = xsnprintf(hdr, limit,
 			    "%s: %s", data->inputprompt, data->inputstr);
@@ -1515,7 +1488,7 @@ window_copy_copy_pipe(struct window_pane *wp, struct session *sess,
 	format_defaults(ft, NULL, sess, NULL, wp);
 	expanded = format_expand(ft, arg);
 
-	job = job_run(expanded, sess, NULL, NULL, NULL);
+	job = job_run(expanded, sess, -1, NULL, NULL, NULL);
 	bufferevent_write(job->event, buf, len);
 
 	free(expanded);
@@ -1542,7 +1515,8 @@ window_copy_append_selection(struct window_pane *wp, const char *bufname)
 {
 	char				*buf;
 	struct paste_buffer		*pb;
-	size_t				 len;
+	const char			*bufdata;
+	size_t				 len, bufsize;
 	struct screen_write_ctx		 ctx;
 
 	buf = window_copy_get_selection(wp, &len);
@@ -1555,17 +1529,16 @@ window_copy_append_selection(struct window_pane *wp, const char *bufname)
 		screen_write_stop(&ctx);
 	}
 
-	if (bufname == NULL || *bufname == '\0') {
-		pb = paste_get_top();
-		if (pb != NULL)
-			bufname = pb->name;
-	} else
+	if (bufname == NULL || *bufname == '\0')
+		pb = paste_get_top(&bufname);
+	else
 		pb = paste_get_name(bufname);
 	if (pb != NULL) {
-		buf = xrealloc(buf, len + pb->size);
-		memmove(buf + pb->size, buf, len);
-		memcpy(buf, pb->data, pb->size);
-		len += pb->size;
+		bufdata = paste_buffer_data(pb, &bufsize);
+		buf = xrealloc(buf, len + bufsize);
+		memmove(buf + bufsize, buf, len);
+		memcpy(buf, bufdata, bufsize);
+		len += bufsize;
 	}
 	if (paste_set(buf, len, bufname, NULL) != 0)
 		free(buf);
@@ -1994,7 +1967,7 @@ window_copy_cursor_jump_back(struct window_pane *wp)
 }
 
 void
-window_copy_cursor_jump_to(struct window_pane *wp)
+window_copy_cursor_jump_to(struct window_pane *wp, int jump_again)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct screen			*back_s = data->backing;
@@ -2002,7 +1975,7 @@ window_copy_cursor_jump_to(struct window_pane *wp)
 	struct utf8_data		 ud;
 	u_int				 px, py, xx;
 
-	px = data->cx + 1;
+	px = data->cx + 1 + jump_again;
 	py = screen_hsize(back_s) + data->cy - data->oy;
 	xx = window_copy_find_length(wp, py);
 
@@ -2021,7 +1994,7 @@ window_copy_cursor_jump_to(struct window_pane *wp)
 }
 
 void
-window_copy_cursor_jump_to_back(struct window_pane *wp)
+window_copy_cursor_jump_to_back(struct window_pane *wp, int jump_again)
 {
 	struct window_copy_mode_data	*data = wp->modedata;
 	struct screen			*back_s = data->backing;
@@ -2033,6 +2006,9 @@ window_copy_cursor_jump_to_back(struct window_pane *wp)
 	py = screen_hsize(back_s) + data->cy - data->oy;
 
 	if (px > 0)
+		px--;
+
+	if (jump_again && px > 0)
 		px--;
 
 	for (;;) {
@@ -2258,4 +2234,59 @@ window_copy_rectangle_toggle(struct window_pane *wp)
 
 	window_copy_update_selection(wp, 1);
 	window_copy_redraw_screen(wp);
+}
+
+void
+window_copy_start_drag(struct client *c, unused struct mouse_event *m)
+{
+	struct window_pane	*wp;
+	u_int			 x, y;
+
+	wp = cmd_mouse_pane(m, NULL, NULL);
+	if (wp == NULL || wp->mode != &window_copy_mode)
+		return;
+
+	if (cmd_mouse_at(wp, m, &x, &y, 1) != 0)
+		return;
+
+	c->tty.mouse_drag_update = window_copy_drag_update;
+	c->tty.mouse_drag_release = window_copy_drag_release;
+
+	window_copy_update_cursor(wp, x, y);
+	window_copy_start_selection(wp);
+	window_copy_redraw_screen(wp);
+}
+
+void
+window_copy_drag_update(unused struct client *c, struct mouse_event *m)
+{
+	struct window_pane		*wp;
+	struct window_copy_mode_data	*data;
+	u_int				 x, y, old_cy;
+
+	wp = cmd_mouse_pane(m, NULL, NULL);
+	if (wp == NULL || wp->mode != &window_copy_mode)
+		return;
+	data = wp->modedata;
+
+	if (cmd_mouse_at(wp, m, &x, &y, 0) != 0)
+		return;
+	old_cy = data->cy;
+
+	window_copy_update_cursor(wp, x, y);
+	if (window_copy_update_selection(wp, 1))
+		window_copy_redraw_selection(wp, old_cy);
+}
+
+void
+window_copy_drag_release(unused struct client *c, struct mouse_event *m)
+{
+	struct window_pane	*wp;
+
+	wp = cmd_mouse_pane(m, NULL, NULL);
+	if (wp == NULL || wp->mode != &window_copy_mode)
+		return;
+
+	window_copy_copy_selection(wp, NULL);
+	window_pane_reset_mode(wp);
 }
