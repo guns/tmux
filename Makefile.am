@@ -247,10 +247,6 @@ install-exec-hook:
 	$(mkdir_p) $(DESTDIR)$(mandir)/man1
 	$(INSTALL_DATA) $(srcdir)/tmux.1.@MANFORMAT@ \
 		$(DESTDIR)$(mandir)/man1/tmux.1
-	rake terminfo
-	for file in terminfo/tmux*; do \
-		tic -o $(DESTDIR)$(mandir)/../terminfo $$file; \
-	done
 
 # Update SF web site.
 upload-index.html: update-index.html
