@@ -17,6 +17,7 @@ task :configure do
     --prefix=#{ENV['PREFIX'] || '/opt/tmux'}
   ]
 
+  cmd << '--enable-static' if ENV['STATIC']
   cmd << '--enable-debug' if ENV['DEBUG']
 
   sh *cmd
