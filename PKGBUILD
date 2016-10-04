@@ -1,6 +1,6 @@
 # Maintainer: Sung Pae <self@sungpae.com>
 pkgname=tmux-nerv
-pkgver=
+pkgver=0
 pkgrel=1
 pkgdesc="Custom tmux build"
 arch=('x86_64')
