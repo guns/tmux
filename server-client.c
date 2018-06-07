@@ -987,16 +987,6 @@ retry:
 		goto retry;
 	}
 
-	/*
-	 * No match in the root table either. If this wasn't the first table
-	 * tried, don't pass the key to the pane.
-	 */
-	if (first != table && (~flags & CLIENT_REPEAT)) {
-		server_client_set_key_table(c, NULL);
-		server_status_client(c);
-		return;
-	}
-
 forward:
 	if (c->flags & CLIENT_READONLY)
 		return;
